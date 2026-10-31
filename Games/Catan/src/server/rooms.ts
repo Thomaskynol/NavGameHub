@@ -29,6 +29,9 @@ export interface Room {
   code: string;
   name: string;
   hostPlayerId: string;
+  /** Dono da instância (htok do Hub, '' = sem dono/legado). Protege contra
+   * fechamento tardio de outra partida que reutilizou o código. */
+  hubToken: string;
   /** Snapshot canônico; null enquanto lobby. */
   state: GameState | null;
   /** 'lobby' ou a fase do estado do jogo. */
@@ -71,6 +74,7 @@ export class Store {
           code: row.code,
           name: row.name,
           hostPlayerId: row.host_player_id,
+          hubToken: typeof row.hub_token === 'string' ? row.hub_token : '',
           state,
           phase: row.phase,
           boardSeed: row.board_seed,

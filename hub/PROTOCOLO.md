@@ -13,6 +13,8 @@ Este arquivo é a fonte de verdade compartilhada entre o servidor do Hub, a inte
 
 Todos escutam em `0.0.0.0`. O Hub monta a URL pública dos jogos a partir do host usado pelo navegador para abrir o Hub (cabeçalho `Host` do WebSocket, sem a porta) e da porta do manifesto. Nada de `localhost` fixo no cliente.
 
+Portas do ambiente (R7) prevalecem sobre o manifesto: `HUB_PORT` para o próprio Hub e `<ID-MAIUSCULO>_PORT` para cada jogo (`ARCADE_PORT`, `VAVA_PORT`, `CATAN_PORT`). Vale para URLs enviadas ao navegador, sondas de saúde e catálogo. Ausente/inválida → usa o manifesto.
+
 ## Identidade
 
 - Apelido: NFKC, `trim`, espaços internos colapsados, 2–16 caracteres. Permitidos letras Unicode, dígitos, espaço, `_` e `-`. Chave de unicidade: NFKC + minúsculas.
@@ -94,26 +96,28 @@ Hub → cliente:
 - Configuração (jogo/capacidade) só pode mudar em `lobby` e sempre reseta a prontidão.
 - Capacidade configurada: `1 ≤ capacity ≤ game.maxPlayers`; não pode ser menor que a ocupação atual; nunca expulsa ninguém.
 - Troca de jogo: só se `game.maxPlayers >= capacity`; a capacidade configurada não é reduzida automaticamente.
-- Início: anfitrião ou automático quando todos os membros conectados estão prontos, há pelo menos `minPlayers` conectados e a capacidade comporta. Quem está desconectado não bloqueia.
+- Início: anfitrião ou automático quando todos os membros jogadores conectados estão prontos, há pelo menos `minPlayers` conectados, a capacidade comporta — e **nenhum jogador ocupa vaga desconectado** (queda temporária segura o início durante a graça; reavalia na saída/expiração, R6). Quem está desconectado não bloqueia por estar ausente: bloqueia por ainda deter vaga.
 - Anfitrião: o membro restante mais antigo (`joinedAt`). Sala vazia é removida.
-- Entrada: por código ou pela lista. `occupancy < capacity` é validado no servidor de forma síncrona. Em `lobby`, entra como `player`; em `playing`, entra como `player` se `midMatchJoin`, senão `waiting`; em `launching`, rejeitada; em `finished`, entra como `waiting` até o retorno ao lobby.
+- Entrada: por código ou pela lista. `occupancy < capacity` é validado no servidor de forma síncrona. Em `lobby`, entra como `player`; em `playing`, entra como `player` se `midMatchJoin`, senão como `waiting` **provisório** — o Hub consulta o estado efetivo do jogo e promove a `player` com `play` (join) quando a partida ainda está no pregame (`phase === 'lobby'` + `joinable === true` + vaga no jogo e no Hub, R5); `waiting` só quando a partida começou ou lotou. Em `launching`, rejeitada; em `finished`, entra como `waiting` até o retorno ao lobby.
 - `leave_match`: o membro em partida passa a `waiting` e a interface remove o iframe; ele continua na sala e ocupa vaga.
 - Fim: o Hub detecta o estado do jogo, mantém o iframe para os resultados por um tempo de graça (VAVA 6 s; Arcade e Catan 15 s), depois volta todos para `lobby`, desmarca prontidão, transforma `waiting` em `player` e limpa a partida.
 
 ### Início e retorno
 
-1. Todos prontos → `launching`. O Hub gera um código de sala do jogo (alfabeto `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, tamanho do jogo) e confirma que está livre via `GET /__hub/state`.
+1. Todos prontos → `launching`. O Hub gera um `htok` (token opaco, 16 bytes hex, único por sala+launch) e **reserva sincronamente** um código de sala do jogo (alfabeto `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, tamanho do jogo), marcando `room.match` **antes** de qualquer I/O — dois lançamentos simultâneos nunca recebem o mesmo código. Lançamentos do mesmo jogo são ainda serializados por um mutex por `gameId` (R2).
 2. O criador (anfitrião conectado ou membro conectado mais antigo) recebe `play` com `create=1`.
-3. O Hub consulta o estado do jogo a cada 300 ms por até 12 s. Quando a sala existe, envia `play` com `create=0` aos demais membros conectados e passa a `playing`.
+3. O Hub consulta o estado do jogo a cada 300 ms por até 12 s. Quando a sala existe, envia `play` com `create=0` aos demais membros conectados e passa a `playing`. Erro transitório de rede durante o lançamento não falha na hora: tenta até o prazo (R8).
 4. A interface do Hub abre o jogo em iframe e mantém uma barra com código, nome do jogo e “Voltar à sala”.
-5. O Hub consulta `GET /__hub/state` a cada 1,5 s. `results`/`ended` → `finished`; 404 por três consultas seguidas também encerra.
-6. Depois da graça, o Hub remove o iframe, volta ao lobby e chama `POST /__hub/close` após 5 s.
+5. O Hub consulta `GET /__hub/state` a cada 1,5 s. `results`/`ended` → `finished`; 404 por três consultas seguidas também encerra. Erro persistente (`state.kind === 'error'` em N consultas seguidas ou por mais de um tempo limite, configurável) → **FALHA**: a sala recebe `GAME_FAILED` (mensagem clara, nunca como fim normal) e volta a `lobby` utilizável; um erro isolado nunca encerra nada (R8).
+6. Depois da graça, o Hub remove o iframe, volta ao lobby e chama `POST /__hub/close` após 5 s — com o `htok` do launch (R3).
 
 Parâmetros passados ao jogo (todos URL-encoded):
 
 ```
-?hub=1&room=<código>&name=<apelido>&create=1|0&expect=<n>&slot=<i>&hubUrl=<url da sala>
+?hub=1&room=<código>&name=<apelido>&create=1|0&expect=<n>&slot=<i>&hubUrl=<url da sala>&htok=<token do launch>
 ```
+
+`htok` é o dono da partida: o jogo o guarda na criação e o confere no fechamento (abaixo). **Retentativa legítima do mesmo launch** (mesmo código + mesmo `htok`, ex. reload do iframe) entra/resume **sem** erro `CODE_TAKEN`. **Colisão real** (mesmo código + `htok` diferente/ausente) responde `CODE_TAKEN`, e o cliente do Hub **não faz join cego**: mostra erro honesto, sem misturar grupos (R2).
 
 No modo Hub o jogo não mostra a tela inicial: cria ou entra automaticamente na sala indicada. A preparação específica (pista, voltas, cores, segundo pronto, tabuleiro) continua na interface do jogo.
 
@@ -137,15 +141,21 @@ Mapeamento:
 - Catan: `phase === 'lobby' && state === null → lobby`, `game_over → results`, demais → `playing`; `joinable = state === null && phase === 'lobby'`.
 - VAVA: `waiting → lobby`, `playing|cardSelection → playing`, `ended → results`; `joinable = !isFull`.
 
-### `POST /__hub/close?room=CODE`
+### `POST /__hub/close?room=CODE&htok=TOKEN`
 
 Remove a sala do jogo e libera recursos. Idempotente. Responde `{ ok:true }`.
 
-### Códigos de sala solicitados
+Com dono (`htok` guardado na criação): só fecha se o `htok` conferir; divergente/ausente → `403 { ok:false, error:'FORBIDDEN' }` e a sala segue intacta — protege reutilização do código por outra partida (R2). Sala sem dono (manual/legada) fecha livremente.
 
-- Arcade: `create` aceita `room` opcional (6 caracteres do alfabeto). Código ocupado → erro `CODE_TAKEN`.
-- Catan: `create_room` aceita `roomCode` opcional (6 caracteres). Ocupado → `CODE_TAKEN`.
-- VAVA: `create` aceita `code` opcional (4 caracteres). Ocupado → erro `CODE_TAKEN`.
+O fechamento pendente sobrevive à destruição da sala do Hub: fica numa fila fora da sala (identidade `gameId`+`gameCode`+`htok`) e é executado imediatamente se a sala for destruída antes do prazo; partidas sucessivas fecham cada uma com seu `htok` (R3). Falha de rede no close não derruba a limpeza (uma nova tentativa; depois best-effort).
+
+### Códigos de sala solicitados e dono da partida (R2)
+
+- Arcade: `create` aceita `room` opcional (6 caracteres do alfabeto) e `htok` opcional. Código ocupado + mesmo `htok` → entra/resume (retentativa legítima); ocupado + `htok` diferente/ausente → `CODE_TAKEN`.
+- Catan: `create_room` aceita `roomCode` opcional (6 caracteres) e `htok` opcional. Ocupado → `CODE_TAKEN`, salvo retentativa legítima do mesmo dono.
+- VAVA: `create` aceita `code` opcional (4 caracteres) e `htok` opcional. Mesma regra: mesmo dono entra/resume; outro dono → `CODE_TAKEN`.
+
+Em todos: o jogo guarda o `htok` como dono opaco (só compara por igualdade; formato `1..64` chars `[A-Za-z0-9_-]`, senão sem dono), nunca gera outro código em silêncio, e o cliente do Hub nunca faz join cego após `CODE_TAKEN` de outra partida.
 
 ### Hooks de teste (somente com `HUB_TEST_HOOKS=1`)
 
@@ -157,6 +167,6 @@ Sem a variável, os hooks respondem 404. Eles existem apenas para testes automat
 
 ## Erros do Hub
 
-`BAD_NICK`, `NICK_TAKEN`, `BAD_GAME`, `GAME_OFFLINE`, `BAD_CAPACITY`, `CAPACITY_GT_MAX`, `CAPACITY_LT_OCCUPANCY`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_IN_MATCH`, `NOT_HOST`, `NOT_IN_ROOM`, `NOT_READY`, `LAUNCHING`, `BAD_PHASE`, `LAUNCH_FAILED`, `RATE`, `INVALID`.
+`BAD_NICK`, `NICK_TAKEN`, `BAD_GAME`, `GAME_OFFLINE`, `BAD_CAPACITY`, `CAPACITY_GT_MAX`, `CAPACITY_LT_OCCUPANCY`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_IN_MATCH`, `NOT_HOST`, `NOT_IN_ROOM`, `NOT_READY`, `LAUNCHING`, `BAD_PHASE`, `LAUNCH_FAILED`, `GAME_FAILED`, `RATE`, `INVALID`.
 
 Mensagens em português, claras e específicas. A interface mostra o motivo e não altera o estado local de forma otimista quando o servidor rejeitar.

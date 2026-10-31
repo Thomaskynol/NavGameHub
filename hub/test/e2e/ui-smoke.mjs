@@ -1,23 +1,26 @@
 // UI smoke: 2 contextos Chromium isolados, Hub real no navegador.
-// Roteiro: nick -> criar (Arcade) -> entrar por código -> prontos ->
-// iframes com mesmo game code -> finish via hook -> retorno ao lobby.
-import { chromium } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+// Roteiro: nick -> criar (VAVA) -> entrar por código -> prontos ->
+// iframes com mesmo game code -> end via hook -> retorno ao lobby.
+// PROOF: hooks — o fim da partida é forçado via hook (não é partida jogada);
+// o fluxo de Hub no navegador (nick/criar/entrar/pronto/iframe) é real.
+import {
+  E2E, hubSecret, launchBrowser, strictCollector, shotPath, proofLine,
+} from './e2e-helpers.mjs';
+import { mkdirSync } from 'node:fs';
 
-const SHOT = '/tmp/opencode/hub-e2e';
-const SECRET = readFileSync('/home/thomaskyn/Documents/dev/Game_Hub/.run/hub_secret', 'utf8').trim();
+proofLine('ui', 'hooks', 'Hub no navegador real; fim forçado por hook');
 
-const browser = await chromium.launch({
-  executablePath: '/usr/bin/chromium',
-  headless: true,
-  args: ['--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'],
-});
+const SECRET = hubSecret();
+mkdirSync(E2E.shotDir, { recursive: true });
 
-async function newHubPage(nick) {
+const browser = await launchBrowser();
+
+async function newHubPage(nick, strict) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[ui] pageerror(${nick}):`, String(e).slice(0, 160)));
-  await page.goto('http://127.0.0.1:8090/', { waitUntil: 'domcontentloaded' });
+  strict.attach(page);
+  await page.goto(`${E2E.hubBase()}/`, { waitUntil: 'domcontentloaded' });
   await page.locator('#nick-input').fill(nick);
   await page.locator('#identity-submit').click();
   await page.locator('#game-grid .game-card').first().waitFor({ timeout: 15000 });
@@ -30,25 +33,26 @@ function check(name, cond, extra = '') {
   if (!cond) pass = false;
 }
 
+const strict = strictCollector('ui');
 try {
   const nickA = `UiA${Date.now().toString(36).slice(-4)}`;
   const nickB = `UiB${Date.now().toString(36).slice(-4)}`;
-  const { ctx: ctxA, page: A } = await newHubPage(nickA);
-  const { ctx: ctxB, page: B } = await newHubPage(nickB);
-  await A.screenshot({ path: `${SHOT}/ui-01-home.png` });
+  const { ctx: ctxA, page: A } = await newHubPage(nickA, strict);
+  const { ctx: ctxB, page: B } = await newHubPage(nickB, strict);
+  await A.screenshot({ path: shotPath('ui-01-home.png') });
 
-  // A cria sala de Arcade.
+  // A cria sala de VAVA.
   await A.locator('.game-card', { hasText: 'VAVA' }).locator('.create-game-btn').click();
   await A.locator('#create-game').selectOption('vava');
   await A.locator('#create-capacity').fill('2');
   const cap = await A.locator('#create-capacity').inputValue();
   console.log(`[ui] capacidade default no diálogo: ${cap}`);
-  await A.screenshot({ path: `${SHOT}/ui-02-create-dialog.png` });
+  await A.screenshot({ path: shotPath('ui-02-create-dialog.png') });
   await A.locator('#create-submit').click();
   await A.locator('#room-code').waitFor({ timeout: 10000 });
   const hubCode = (await A.locator('#room-code').textContent()).trim();
   console.log(`[ui] sala Hub: ${hubCode}`);
-  await A.screenshot({ path: `${SHOT}/ui-03-room-host.png` });
+  await A.screenshot({ path: shotPath('ui-03-room-host.png') });
 
   // B entra pelo código.
   await B.locator('#join-code').fill(hubCode);
@@ -56,7 +60,7 @@ try {
   await B.locator('#room-code').waitFor({ timeout: 10000 });
   const hubCodeB = (await B.locator('#room-code').textContent()).trim();
   check('B entrou na mesma sala pelo código', hubCodeB === hubCode, `${hubCodeB}`);
-  await B.screenshot({ path: `${SHOT}/ui-04-room-guest.png` });
+  await B.screenshot({ path: shotPath('ui-04-room-guest.png') });
 
   // Ambos prontos -> partida (botão some ao sair do lobby; espera o iframe).
   await A.locator('#ready-btn').click();
@@ -94,11 +98,11 @@ try {
   console.log(`[ui] iframe B: ${srcB?.slice(0, 120)}`);
   check('iframes apontam p/ o mesmo game code', !!codeA && codeA === codeB, `${codeA} vs ${codeB}`);
   await A.waitForTimeout(4000);
-  await A.screenshot({ path: `${SHOT}/ui-05-match-a.png` });
-  await B.screenshot({ path: `${SHOT}/ui-05-match-b.png` });
+  await A.screenshot({ path: shotPath('ui-05-match-a.png') });
+  await B.screenshot({ path: shotPath('ui-05-match-b.png') });
 
   // Encerra via hook; ambos voltam ao lobby (graça VAVA 6s).
-  const fin = await fetch(`http://127.0.0.1:8092/__hub/test/end?room=${codeA}`, {
+  const fin = await fetch(`${E2E.gameBase(E2E.vavaPort)}/__hub/test/end?room=${codeA}`, {
     method: 'POST', headers: { 'x-hub-secret': SECRET },
   });
   console.log(`[ui] hook end: ${fin.status}`);
@@ -107,7 +111,10 @@ try {
   const backA = (await A.locator('#room-code').textContent()).trim();
   const backB = (await B.locator('#room-code').textContent()).trim();
   check('retorno à mesma sala', backA === hubCode && backB === hubCode, `${backA},${backB}`);
-  await A.screenshot({ path: `${SHOT}/ui-06-back-lobby.png` });
+  await A.screenshot({ path: shotPath('ui-06-back-lobby.png') });
+
+  const v = strict.verdict();
+  check('sem pageerror/falhas de recursos necessários', v.ok, v.detail);
 
   await ctxA.close();
   await ctxB.close();

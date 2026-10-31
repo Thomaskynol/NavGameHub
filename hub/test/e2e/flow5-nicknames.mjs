@@ -1,5 +1,8 @@
 // F5: apelido único no Hub inteiro (entre salas) + liberação após grace (20s).
-import { HubClient, uniqNick, delay, waitOnline } from './e2e-helpers.mjs';
+// PROOF: regras — unicidade e liberação de nick pelas regras normais.
+import { HubClient, uniqNick, delay, waitOnline, proofLine } from './e2e-helpers.mjs';
+
+proofLine('f5', 'regras', 'nick único global + liberação pós-grace');
 
 let pass = true;
 function check(name, cond, extra = '') {

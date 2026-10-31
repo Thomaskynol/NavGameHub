@@ -174,9 +174,21 @@ export function validateLobbyCommand(p: unknown): { ok: true; value: LobbyComman
         }
         roomCode = rc;
       }
+      // Dono da instância (htok do Hub): opcional, identifica a partida do Hub
+      // para retentativa legítima (mesmo htok) vs colisão (htok diferente).
+      let hubToken: string | undefined;
+      if (p.hubToken !== undefined) {
+        if (typeof p.hubToken !== 'string') return { ok: false, error: invalid('Token do Hub inválido') };
+        const t = p.hubToken.trim();
+        if (t.length === 0 || t.length > 128 || !/^[A-Za-z0-9\-_]+$/.test(t)) {
+          return { ok: false, error: invalid('Token do Hub inválido') };
+        }
+        hubToken = t;
+      }
       const value: Extract<LobbyCommand, { type: 'create_room' }> = { type: 'create_room', nickname };
       if (roomName !== undefined) value.roomName = roomName;
       if (roomCode !== undefined) value.roomCode = roomCode;
+      if (hubToken !== undefined) value.hubToken = hubToken;
       return { ok: true, value };
     }
     case 'join_room': {

@@ -1,12 +1,48 @@
-// Helper WS para os fluxos E2E do Hub (não toca em fontes do projeto).
+// Helpers compartilhados dos fluxos E2E (não tocam em fontes do projeto).
+//
+// Portabilidade: tudo deriva da raiz do repo (este arquivo está em
+// hub/test/e2e/) e de env, sem caminhos absolutos pessoais — pendrive-safe.
+//   E2E_HUB_PORT / E2E_ARCADE_PORT / E2E_VAVA_PORT / E2E_CATAN_PORT
+//     portas efêmeras exportadas pelo orquestrador (run-all.mjs). Ausentes
+//     => cai nos padrões do start.sh (8090..8093), p/ rodar um fluxo avulso
+//     contra uma instância já no ar.
+//   E2E_HUB_SECRET (ou HUB_SECRET) tem precedência sobre .run/hub_secret.
+//   E2E_SHOT_DIR: onde os verificadores de navegador salvam screenshots.
+//   CHROMIUM_PATH: executável do Chromium (senão, autodetecta).
 import WebSocket from 'ws';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
 
-export const HUB_WS = 'ws://127.0.0.1:8090/ws';
-export const SECRET_FILE = '/home/thomaskyn/Documents/dev/Game_Hub/.run/hub_secret';
+// Raiz do repo = três níveis acima de hub/test/e2e/.
+export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+function numEnv(name, fallback) {
+  const raw = process.env[name];
+  const n = raw !== undefined && raw !== '' ? Number(raw) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+export const E2E = {
+  hubPort: numEnv('E2E_HUB_PORT', 8090),
+  arcadePort: numEnv('E2E_ARCADE_PORT', 8091),
+  vavaPort: numEnv('E2E_VAVA_PORT', 8092),
+  catanPort: numEnv('E2E_CATAN_PORT', 8093),
+  hubBase() { return `http://127.0.0.1:${this.hubPort}`; },
+  hubWs() { return `ws://127.0.0.1:${this.hubPort}/ws`; },
+  gameBase(port) { return `http://127.0.0.1:${port}`; },
+  shotDir: process.env.E2E_SHOT_DIR || join(tmpdir(), 'hub-e2e'),
+};
+
+// Compat: nome antigo usado como default em alguns fluxos.
+export const HUB_WS = E2E.hubWs();
+export const SECRET_FILE = join(REPO_ROOT, '.run', 'hub_secret');
 export { SECRET_FILE as _SECRET_FILE };
 
-import { readFileSync } from 'node:fs';
 export function hubSecret() {
+  const fromEnv = process.env.E2E_HUB_SECRET || process.env.HUB_SECRET;
+  if (fromEnv && fromEnv.trim() !== '') return fromEnv.trim();
   return readFileSync(SECRET_FILE, 'utf8').trim();
 }
 
@@ -20,7 +56,7 @@ export class HubClient {
     this.messages = [];
     this.waiters = [];
   }
-  connect(url = HUB_WS) {
+  connect(url = E2E.hubWs()) {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(url);
       this.ws.once('open', resolve);
@@ -188,7 +224,7 @@ let n = 0;
 export function uniqNick(base) {
   n += 1;
   // NFKC/lower colapsado; base ASCII + sufixo garante unicidade entre runs.
-  return `${base}${Date.now().toString(36).slice(-4)}${n}`.slice(0, 16);
+  return `${base}${Date.now().toString(36).slice(4)}${n}`.slice(0, 16);
 }
 
 // Aguarda o Hub marcar o jogo como online (probe periódico de saúde).
@@ -203,4 +239,105 @@ export async function waitOnline(client, gameId, timeout = 60000) {
     }
     await delay(1000);
   }
+}
+
+// --- Rótulo de prova (R9): todo fluxo declara de que tipo é a evidência. ---
+// hooks     = final forçado por hook de teste (não é partida completa).
+// regras    = término/efeito pelas regras normais, sem jogar tudo.
+// play-real = ações reais de jogo até o fim (ou progresso real sem hook).
+export function proofLine(tag, proof, desc) {
+  console.log(`[${tag}] proof=${proof} — ${desc}`);
+}
+
+// --- Navegador estrito (R9) ---
+//
+// pageerror e falhas de recursos NECESSÁRIOS (scripts do Hub/jogos, WS,
+// respostas HTTP do mesmo host do Hub ou dos jogos) reprovam o teste.
+// Allowlist justificada (benigna, não mascara defeito real):
+//   - /favicon.ico (navegador pede sozinho; Hub/jogos podem não servir um):
+//     404 aqui não afeta o jogo.
+//   - *.map (source maps ausentes em build de produção não quebram nada).
+const BENIGN_URL = [/\/favicon\.ico(\?|$)/, /\.map(\?|$)/];
+
+function isBenignUrl(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return true; // data:, blob:, etc.
+  } catch {
+    return true;
+  }
+  return BENIGN_URL.some((re) => re.test(url));
+}
+
+function isHubOrGameUrl(url) {
+  try {
+    const u = new URL(url);
+    const port = Number(u.port);
+    return [E2E.hubPort, E2E.arcadePort, E2E.vavaPort, E2E.catanPort].includes(port);
+  } catch {
+    return false;
+  }
+}
+
+export function strictCollector(tag) {
+  const errors = [];
+  return {
+    errors,
+    attach(page) {
+      page.on('pageerror', (e) => {
+        errors.push(`pageerror: ${String(e && e.message || e).slice(0, 200)}`);
+      });
+      page.on('requestfailed', (r) => {
+        const url = r.url();
+        if (isBenignUrl(url)) return;
+        // Falha de handshake WS ou de recurso necessário: reprova.
+        errors.push(`requestfailed: ${url.slice(0, 160)} ${r.failure()?.errorText || ''}`);
+      });
+      page.on('response', (r) => {
+        if (r.ok()) return;
+        const url = r.url();
+        if (!isHubOrGameUrl(url)) return;
+        if (isBenignUrl(url)) return;
+        errors.push(`http-${r.status()}: ${url.slice(0, 160)}`);
+      });
+    },
+    // Devolve {ok, detail} p/ usar com check(): sem achados => ok.
+    verdict() {
+      return { ok: errors.length === 0, detail: errors.slice(0, 5).join(' | ') };
+    },
+  };
+}
+
+export function resolveChromium() {
+  if (process.env.CHROMIUM_PATH && existsSync(process.env.CHROMIUM_PATH)) {
+    return process.env.CHROMIUM_PATH;
+  }
+  const sys = ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'];
+  for (const p of sys) if (existsSync(p)) return p;
+  // Cache do Playwright (~/.cache/ms-playwright/chromium-*/chrome-linux/chrome).
+  try {
+    const cache = join(homedir(), '.cache', 'ms-playwright');
+    const entries = readdirSync(cache).filter((e) => e.startsWith('chromium-') || e.startsWith('chromium_headless_shell-'));
+    entries.sort().reverse();
+    for (const e of entries) {
+      for (const sub of ['chrome-linux/chrome', 'chrome-linux/headless_shell']) {
+        const p = join(cache, e, sub);
+        if (existsSync(p)) return p;
+      }
+    }
+  } catch { /* sem cache acessível */ }
+  throw new Error('Chromium não encontrado (CHROMIUM_PATH, /usr/bin/chromium*, cache ms-playwright)');
+}
+
+export async function launchBrowser() {
+  const { chromium } = await import('playwright-core');
+  return chromium.launch({
+    executablePath: resolveChromium(),
+    headless: true,
+    args: ['--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'],
+  });
+}
+
+export function shotPath(name) {
+  return join(E2E.shotDir, name);
 }

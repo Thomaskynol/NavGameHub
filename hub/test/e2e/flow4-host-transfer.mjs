@@ -1,5 +1,8 @@
 // F4: anfitrião sai -> outro assume; último a sair remove a sala da lista.
-import { HubClient, uniqNick, delay, waitOnline } from './e2e-helpers.mjs';
+// PROOF: regras — transferência de anfitrião e limpeza pelas regras normais.
+import { HubClient, uniqNick, delay, waitOnline, proofLine } from './e2e-helpers.mjs';
+
+proofLine('f4', 'regras', 'host-transfer e remoção de sala vazia');
 
 let pass = true;
 function check(name, cond, extra = '') {

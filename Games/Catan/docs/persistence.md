@@ -2,13 +2,13 @@
 
 Banco: SQLite via `node:sqlite` (módulo nativo do Node ≥ 22.13), caminho em `DB_PATH` (default `db/catan.db`). Nenhuma dependência nativa externa.
 
-## Formato (migração inicial)
+## Formato (migração v2)
 
-`PRAGMA user_version = 1`.
+`PRAGMA user_version = 2` (`meta.format = "2").
 
 | Tabela | Conteúdo |
 |---|---|
-| `rooms` | código (PK), nome, anfitrião, `state_json` (snapshot completo do `GameState`), fase, `version`, seed do tabuleiro, timestamps, `closed` |
+| `rooms` | código (PK), nome, anfitrião, `state_json` (snapshot completo do `GameState`), fase, `version`, seed do tabuleiro, timestamps, `closed`, `hub_token` (dono da instância, v2) |
 | `members` | sala+jogador (PK), apelido, cor, `recovery_hash` (SHA-256 hex, único), `ready`, `joined_at` |
 | `processed_commands` | `request_id`+`player_id` (PK), hash do payload, resposta JSON armazenada (idempotência) |
 | `chat` | últimas ~200 mensagens por sala |
@@ -34,4 +34,11 @@ Banco: SQLite via `node:sqlite` (módulo nativo do Node ≥ 22.13), caminho em `
 
 ## Limpeza
 
-- Salas encerradas (vitória + saída de todos) marcadas `closed = 1` (ou removidas com o chat junto) — nunca automaticamente por erro de leitura.
+- Sala encerrada (`POST /__hub/close` autorizado ou último `leave_room`) é
+  **removida por completo** (sala + membros + chat + `processed_commands`) e o
+  código fica livre para reutilização segura (com identidade `hub_token`).
+- Migração v1 → v2: adiciona `rooms.hub_token` e apaga salas com `closed = 1`
+  (códigos históricos que bloqueavam reutilização para sempre) com seus dados.
+- Sala fechada nunca bloqueia código novo: `roomCodeExists` considera só
+  `closed = 0`, e `insertRoom` descarta resíduo `closed = 1` na mesma transação.
+- Nunca apagar sala por erro de leitura.

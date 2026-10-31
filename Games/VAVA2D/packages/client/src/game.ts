@@ -22,7 +22,7 @@ import { Renderer } from './renderer.js';
 import type { RenderBullet, RenderDrop, RenderGrenade, RenderPlayer, RenderPowerup } from './renderer.js';
 
 type JoinRequest =
-  | { t: 'create'; name: string; code?: string }
+  | { t: 'create'; name: string; code?: string; htok?: string | null }
   | { t: 'join'; code: string; name: string };
 
 export interface HubParams {
@@ -30,6 +30,7 @@ export interface HubParams {
   name: string;
   create: boolean;
   hubUrl: string;
+  htok: string | null;
 }
 
 export class Game {
@@ -85,7 +86,7 @@ export class Game {
     this.hub = hub;
     this.hud.enterHubMode(hub.hubUrl);
     if (hub.create) {
-      void this.connect({ t: 'create', name: hub.name, code: hub.room });
+      void this.connect({ t: 'create', name: hub.name, code: hub.room, htok: hub.htok });
     } else {
       void this.connect({ t: 'join', code: hub.room, name: hub.name });
     }
@@ -148,16 +149,9 @@ export class Game {
         this.hadError = true;
         this.connecting = false;
         if (this.hub) {
-          // Reload retry: sala já existe — entra nela em vez de falhar.
-          if (this.hub.create && message.message.includes('CODE_TAKEN')) {
-            const hub = { ...this.hub, create: false };
-            this.hub = hub;
-            this.connection?.close();
-            this.connection = null;
-            this.hadError = false;
-            void this.connect({ t: 'join', code: hub.room, name: hub.name });
-            return;
-          }
+          // Retentativa legítima do mesmo launch nunca recebe CODE_TAKEN (o
+          // servidor entra/resume direto pelo htok); CODE_TAKEN aqui é colisão
+          // real com outra partida → erro honesto, SEM join cego (R2).
           this.hud.showHubError(message.message);
           this.connection?.close();
           this.connection = null;

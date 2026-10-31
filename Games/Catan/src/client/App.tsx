@@ -134,14 +134,17 @@ function RealApp() {
             type: 'create_room',
             nickname: params.name,
             roomCode: params.room,
+            ...(params.htok ? { hubToken: params.htok } : {}),
           });
           if (created.ok && created.session) {
             adoptSession(created.session);
             setHubState('done');
             return;
           }
-          // Sala já existe (tentativa repetida): entra nela em vez de falhar.
-          if (!created.ok && created.error.code !== 'CODE_TAKEN') {
+          // Falha honesta, sem join cego: CODE_TAKEN indica colisão com outra
+          // partida (dono diferente). Retentativa legítima (mesmo htok) entra
+          // no servidor como nova vaga e retorna ok — nunca cai aqui.
+          if (!created.ok) {
             setHubError(errorText(created.error));
             setHubState('failed');
             return;

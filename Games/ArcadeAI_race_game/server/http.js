@@ -111,6 +111,17 @@ export function createHttpHandler({
 
     if (pathname === '/__hub/close') {
       if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }); res.end(); return; }
+      // Fecha com identidade (R2): sala com dono (htok) só fecha com o mesmo
+      // htok do launch (`?htok=`); sem ele → 403 e a sala segue intacta.
+      // Sala sem dono (manual/legada) mantém o comportamento anterior.
+      const room = rooms ? rooms.getRoom(code) : null;
+      if (room && room.htok) {
+        const htok = String(url.searchParams.get('htok') ?? '');
+        if (htok !== room.htok) {
+          sendJson(res, 403, { ok: false, error: 'FORBIDDEN' });
+          return;
+        }
+      }
       if (rooms) rooms.closeRoom(code);
       sendJson(res, 200, { ok: true });
       return;

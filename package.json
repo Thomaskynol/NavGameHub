@@ -11,10 +11,11 @@
     "setup": "bash prepare.sh",
     "start": "bash start.sh",
     "stop": "bash stop.sh",
-    "test": "npm run test:hub && npm run test:games",
+    "test": "npm run test:hub && npm run test:scripts && npm run test:games",
     "test:hub": "node --test \"hub/test/**/*.test.js\"",
+    "test:scripts": "bash scripts/test/test-scripts.sh",
     "test:games": "npm --prefix Games/ArcadeAI_race_game test && npm --prefix Games/Catan test && npm --prefix Games/VAVA2D test",
-    "e2e": "node test/e2e/run.mjs"
+    "e2e": "node hub/test/e2e/run-all.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

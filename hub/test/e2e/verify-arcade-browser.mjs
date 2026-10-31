@@ -1,23 +1,26 @@
-// Re-verificação BUG-2: Arcade honra ?hub=1 — 2 Chromiums isolados, SEM cliques no jogo.
+// Re-verificação: Arcade honra ?hub=1 — 2 Chromiums isolados, SEM cliques no jogo.
 // Hub: nick → criar → entrar por código → prontos → iframes entram sozinhos na
 // MESMA sala do Arcade → hook finish → retorno ao lobby.
-import { chromium } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+// PROOF: hooks — o fim da corrida é forçado via hook; a entrada automática dos
+// iframes na sala do jogo (o que esta prova cobre) usa o fluxo normal.
+import {
+  E2E, hubSecret, launchBrowser, strictCollector, shotPath, proofLine,
+} from './e2e-helpers.mjs';
+import { mkdirSync } from 'node:fs';
 
-const SHOT = '/tmp/opencode/hub-e2e';
-const SECRET = readFileSync('/home/thomaskyn/Documents/dev/Game_Hub/.run/hub_secret', 'utf8').trim();
+proofLine('ab', 'hooks', 'iframes entram sozinhos; fim forçado por hook');
 
-const browser = await chromium.launch({
-  executablePath: '/usr/bin/chromium',
-  headless: true,
-  args: ['--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'],
-});
+const SECRET = hubSecret();
+mkdirSync(E2E.shotDir, { recursive: true });
 
-async function newHubPage(nick) {
+const browser = await launchBrowser();
+
+async function newHubPage(nick, strict) {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[ab] pageerror(${nick}):`, String(e).slice(0, 160)));
-  await page.goto('http://127.0.0.1:8090/', { waitUntil: 'domcontentloaded' });
+  strict.attach(page);
+  await page.goto(`${E2E.hubBase()}/`, { waitUntil: 'domcontentloaded' });
   await page.locator('#nick-input').fill(nick);
   await page.locator('#identity-submit').click();
   await page.locator('#game-grid .game-card').first().waitFor({ timeout: 15000 });
@@ -30,11 +33,12 @@ function check(name, cond, extra = '') {
   if (!cond) pass = false;
 }
 
+const strict = strictCollector('ab');
 try {
   const nickA = `ArB${Date.now().toString(36).slice(-4)}a`;
   const nickB = `ArB${Date.now().toString(36).slice(-4)}b`;
-  const { ctx: ctxA, page: A } = await newHubPage(nickA);
-  const { ctx: ctxB, page: B } = await newHubPage(nickB);
+  const { ctx: ctxA, page: A } = await newHubPage(nickA, strict);
+  const { ctx: ctxB, page: B } = await newHubPage(nickB, strict);
 
   await A.locator('.game-card', { hasText: 'Asfalto' }).locator('.create-game-btn').click();
   await A.locator('#create-game').selectOption('arcade');
@@ -52,7 +56,7 @@ try {
   await A.locator('#ready-btn').click();
   await B.locator('#ready-btn').click();
 
-  // Sem BUG-2, o Hub ficaria em launching até LAUNCH_FAILED (12s). Com a
+  // Sem a correção, o Hub ficaria em launching até LAUNCH_FAILED (12s). Com a
   // correção, os iframes criam/entram sozinhos e o Hub chega a playing.
   const frameA = A.locator('#match-frame-wrap iframe');
   const frameB = B.locator('#match-frame-wrap iframe');
@@ -66,10 +70,10 @@ try {
   // Fase playing = o jogo criou a sala sozinho (antes: impossível).
   await A.locator('#match-frame-wrap iframe').waitFor({ timeout: 5000 });
   await A.waitForTimeout(4000);
-  await A.screenshot({ path: `${SHOT}/arcade2-match-a.png` });
-  await B.screenshot({ path: `${SHOT}/arcade2-match-b.png` });
+  await A.screenshot({ path: shotPath('arcade2-match-a.png') });
+  await B.screenshot({ path: shotPath('arcade2-match-b.png') });
 
-  const fin = await fetch(`http://127.0.0.1:8091/__hub/test/finish?room=${codeA}`, {
+  const fin = await fetch(`${E2E.gameBase(E2E.arcadePort)}/__hub/test/finish?room=${codeA}`, {
     method: 'POST', headers: { 'x-hub-secret': SECRET },
   });
   check('hook finish arcade', fin.status === 200, `${fin.status}`);
@@ -78,7 +82,10 @@ try {
   const backA = (await A.locator('#room-code').textContent()).trim();
   const backB = (await B.locator('#room-code').textContent()).trim();
   check('retorno à mesma sala', backA === hubCode && backB === hubCode, `${backA},${backB}`);
-  await A.screenshot({ path: `${SHOT}/arcade2-back.png` });
+  await A.screenshot({ path: shotPath('arcade2-back.png') });
+
+  const v = strict.verdict();
+  check('sem pageerror/falhas de recursos necessários', v.ok, v.detail);
 
   await ctxA.close();
   await ctxB.close();

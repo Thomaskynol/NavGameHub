@@ -19,6 +19,7 @@ describe('parseHubParams', () => {
       expect: 3,
       slot: 0,
       hubUrl: 'http://10.0.0.2:8090/?room=HZ12',
+      htok: '',
     });
   });
 
@@ -33,5 +34,12 @@ describe('parseHubParams', () => {
     expect(parseHubParams('?hub=1&room=ab-cd-ef!!&name=Ana')?.room).toBe('ABCDEF');
     expect(parseHubParams('?hub=1&room=ABCDEF&name=%20%20')).toBeNull();
     expect(parseHubParams('?hub=1&name=Ana')).toBeNull();
+  });
+
+  it('lê htok do Hub; ausente/inválido vira string vazia', () => {
+    expect(parseHubParams('?hub=1&room=ABCDEF&name=Ana&htok=dono-abc_123')?.htok).toBe('dono-abc_123');
+    expect(parseHubParams('?hub=1&room=ABCDEF&name=Ana')?.htok).toBe('');
+    // Token com caracteres fora do alfabeto é descartado (legado segue sem dono).
+    expect(parseHubParams('?hub=1&room=ABCDEF&name=Ana&htok=mau%20token!')?.htok).toBe('');
   });
 });

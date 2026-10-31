@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 /** Retenção de chat por sala (docs/persistence.md: ~200). */
 export const CHAT_RETENTION = 200;
 /** Idempotência antiga removida no boot (segundos * 1000). */
@@ -20,6 +20,8 @@ export interface RoomRow {
   created_at: number;
   updated_at: number;
   closed: number;
+  /** Dono da instância (htok do Hub); '' = sem dono/legado. */
+  hub_token: string;
 }
 
 export interface MemberRow {
@@ -64,6 +66,23 @@ function migrate(db: DatabaseSync): void {
     pruneProcessed(db);
     return;
   }
+  if (current === 1) {
+    // v1 -> v2: identidade do dono (htok) + libera códigos históricos fechados.
+    // Salas fechadas bloqueavam o código para sempre (404 no state + CODE_TAKEN
+    // no create); a partir da v2 sala fechada é removida e o código é reutilizável
+    // com segurança via hub_token (fechamento tardio confere o dono).
+    db.exec('ALTER TABLE rooms ADD COLUMN hub_token TEXT NOT NULL DEFAULT \'\'');
+    db.exec(`
+      DELETE FROM members WHERE room_code IN (SELECT code FROM rooms WHERE closed = 1);
+      DELETE FROM chat WHERE room_code IN (SELECT code FROM rooms WHERE closed = 1);
+      DELETE FROM processed_commands WHERE room_code IN (SELECT code FROM rooms WHERE closed = 1);
+      DELETE FROM rooms WHERE closed = 1;
+    `);
+    db.prepare('PRAGMA user_version = 2').run();
+    db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('format', String(SCHEMA_VERSION));
+    pruneProcessed(db);
+    return;
+  }
   if (current !== 0) {
     throw new Error(`Banco em formato desconhecido (${current}); nada foi apagado. Restaure backup.`);
   }
@@ -79,7 +98,8 @@ function migrate(db: DatabaseSync): void {
       board_seed TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      closed INTEGER NOT NULL DEFAULT 0
+      closed INTEGER NOT NULL DEFAULT 0,
+      hub_token TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE members (
       room_code TEXT NOT NULL,
@@ -117,7 +137,7 @@ function migrate(db: DatabaseSync): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
-    PRAGMA user_version = 1;
+    PRAGMA user_version = 2;
     COMMIT;
   `);
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('format', String(SCHEMA_VERSION));
@@ -161,15 +181,29 @@ export function loadChatRows(db: DatabaseSync, roomCode: string, limit: number):
 
 export function insertRoom(
   db: DatabaseSync,
-  r: { code: string; name: string; hostPlayerId: string; phase: string; version: number; boardSeed: string; createdAt: number },
+  r: { code: string; name: string; hostPlayerId: string; phase: string; version: number; boardSeed: string; createdAt: number; hubToken?: string },
 ): void {
+  // Reutilização segura: um registro fechado residual (v1) com o mesmo código
+  // é descartado aqui, dentro da transação do chamador. Sala aberta nunca é
+  // tocada: se existir, o INSERT abaixo viola a PK e desfaz a transação.
+  const stale = db.prepare('SELECT 1 AS x FROM rooms WHERE code = ? AND closed = 1').get(r.code) !== undefined;
+  if (stale) deleteRoomData(db, r.code);
   db.prepare(
-    'INSERT INTO rooms (code, name, host_player_id, state_json, phase, version, board_seed, created_at, updated_at, closed) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, 0)',
-  ).run(r.code, r.name, r.hostPlayerId, r.phase, r.version, r.boardSeed, r.createdAt, r.createdAt);
+    'INSERT INTO rooms (code, name, host_player_id, state_json, phase, version, board_seed, created_at, updated_at, closed, hub_token) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, 0, ?)',
+  ).run(r.code, r.name, r.hostPlayerId, r.phase, r.version, r.boardSeed, r.createdAt, r.createdAt, r.hubToken ?? '');
 }
 
+/** Só sala aberta bloqueia o código; fechada foi removida e é reutilizável. */
 export function roomCodeExists(db: DatabaseSync, code: string): boolean {
-  return db.prepare('SELECT 1 AS x FROM rooms WHERE code = ?').get(code) !== undefined;
+  return db.prepare('SELECT 1 AS x FROM rooms WHERE code = ? AND closed = 0').get(code) !== undefined;
+}
+
+/** Remove sala + membros + chat + idempotência (encerramento; libera o código). */
+export function deleteRoomData(db: DatabaseSync, code: string): void {
+  db.prepare('DELETE FROM processed_commands WHERE room_code = ?').run(code);
+  db.prepare('DELETE FROM chat WHERE room_code = ?').run(code);
+  db.prepare('DELETE FROM members WHERE room_code = ?').run(code);
+  db.prepare('DELETE FROM rooms WHERE code = ?').run(code);
 }
 
 export function recoveryHashExists(db: DatabaseSync, hash: string): boolean {

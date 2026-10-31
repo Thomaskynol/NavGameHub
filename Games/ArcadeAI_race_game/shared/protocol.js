@@ -3,8 +3,8 @@
 // Uso: import { C2S, S2C } e confira `msg.t`.
 
 export const C2S = {
-  CREATE: 'create',        // {name, color?, room?}  (room = código pedido pelo Hub)
-  JOIN: 'join',            // {room, name, color?, resume?}
+  CREATE: 'create',        // {name, color?, room?, htok?}  (room = código pedido pelo Hub; htok = dono p/ retry/close)
+  JOIN: 'join',            // {room, name, color?, resume?, htok?}  (htok aceito como contexto do launch; identidade do resume é o token)
   LEAVE: 'leave',          // {}
   SET: 'set',              // {color?|null, ready?|null, track?|null, laps?|null}
   START: 'start',          // {}

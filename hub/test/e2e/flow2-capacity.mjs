@@ -1,7 +1,11 @@
 // F2: regras de capacidade (servidor).
+// PROOF: regras — validações de capacidade e corrida pela última vaga,
+// sem hooks e sem partida (término pelas regras normais: erro esperado).
 // 2a: capacity > game.max bloqueado (CAPACITY_GT_MAX). 2b: reduzir abaixo da
 // ocupação bloqueado (CAPACITY_LT_OCCUPANCY). 2c: corrida pela última vaga.
-import { HubClient, uniqNick, delay, waitOnline } from './e2e-helpers.mjs';
+import { HubClient, uniqNick, delay, waitOnline, proofLine } from './e2e-helpers.mjs';
+
+proofLine('f2', 'regras', 'capacidade: limites e condição de corrida, sem partida');
 
 let pass = true;
 function check(name, cond, extra = '') {

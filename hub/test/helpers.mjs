@@ -66,6 +66,8 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
   };
   const rooms = new Map();
   const requests = [];
+  // Injeção de falha para R8: responde 500 nas próximas N consultas de state.
+  let failStateCount = 0;
 
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -74,6 +76,7 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
       method: req.method,
       path: url.pathname,
       room: roomCode,
+      htok: url.searchParams.get('htok'),
       secret: req.headers['x-hub-secret'],
     });
 
@@ -83,6 +86,11 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
         return;
       }
       if (url.pathname === '/__hub/state') {
+        if (failStateCount > 0) {
+          failStateCount -= 1;
+          writeJson(res, 500, { ok: false, error: 'BOOM' });
+          return;
+        }
         const room = rooms.get(roomCode);
         if (!room) {
           writeJson(res, 404, { ok: false, error: 'NOT_FOUND' });
@@ -130,6 +138,9 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
     server,
     rooms,
     requests,
+    setFailState(n) {
+      failStateCount = n;
+    },
     createRoom(code, options = {}) {
       rooms.set(code, {
         code,

@@ -39,6 +39,32 @@ Transporte: Socket.IO sobre HTTP (mesma origem; em dev o proxy do Vite encaminha
 - Modos: `resume` (retomar sem conflito), `takeover` (assumir explicitamente; anterior recebe `session_replaced`), `claim` (recuperação por código em navegador novo). Conflito com conexão ativa → `bind_conflict` + `SESSION_CONFLICT`.
 - Um socket = um jogador; comandos validados contra o vínculo; sala diferente → `NOT_IN_ROOM`.
 
+## Integração com o Hub (`/__hub/*`, htok)
+
+Contrato com a frente do Hub (launch passa `&htok=<token>` na URL):
+
+- `create_room` aceita `roomCode` (código pedido pelo Hub) + `hubToken` opcional
+  (dono da instância, vindo de `htok`):
+  - código livre → cria guardando o dono (`hubToken`, `''` = legado);
+  - código ocupado + mesmo `hubToken` (não vazio, igual ao da sala) → retentativa
+    legítima: entra na sala existente como nova vaga (lobby, com vaga e cor livre),
+    sem `CODE_TAKEN`; sala cheia/iniciada retorna `ROOM_FULL`/`ALREADY_STARTED`;
+  - código ocupado + `hubToken` diferente/ausente → `CODE_TAKEN` honesto.
+- O cliente do Hub (`App.tsx`, modo `?hub=1`) envia `hubToken` no `create` e
+  **nunca faz join cego** após `CODE_TAKEN`: qualquer falha no `create` vira tela
+  de erro honesta ("código em uso"). Retentativa legítima já retorna `ok` no
+  servidor, então `CODE_TAKEN` sempre indica colisão com outra partida.
+- `POST /__hub/close?room=CODE&htok=TOKEN` (com `x-hub-secret`): idempotente,
+  responde sempre `{ ok:true }`. Com dono (`hubToken` não vazio), só fecha se o
+  `htok` conferir; fechamento tardio de partida antiga nunca atinge a partida
+  nova que reutilizou o código. Sem dono (legado), fecha como antes.
+  Sala inexistente → `{ ok:true }` (nada a fazer).
+- `GET /__hub/state?room=CODE`: sala aberta → `200` com fase/jogadores;
+  sala fechada/removida → `404 NOT_FOUND`. Como sala fechada é **removida**
+  (código liberado), não há janela `404 → CODE_TAKEN` para o solicitante
+  legítimo além do transitório de propagação (o `close` é síncrono: memória +
+  SQLite na mesma chamada).
+
 ## Projeções
 
 - `GameView`: público + `you` privado (mão, tipos das dev cards, pontuação real, taxa de banco, portos).

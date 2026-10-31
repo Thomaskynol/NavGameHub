@@ -14,7 +14,7 @@ import { loadSettings, saveSettings, loadRecords, saveRecord } from './store.js'
 import { TRACKS } from '/shared/tracks.js';
 import { createSampler } from '/shared/trackMath.js';
 import { PHYSICS, STATE_HZ, STORAGE } from '/shared/constants.js';
-import { parseHubParams } from './hub.js';
+import { parseHubParams, hubResumeAction } from './hub.js';
 
 // ---------------------------------------------------------------- traduções
 
@@ -429,7 +429,10 @@ function onJoined(msg) {
   selfId = msg.you;
   roomCode = msg.room;
   const s = loadSettings();
-  session = { room: msg.room, id: msg.you, token: msg.token, name: s.nickname, color: s.color };
+  session = {
+    room: msg.room, id: msg.you, token: msg.token, name: s.nickname, color: s.color,
+    ...(hubMode?.htok ? { htok: hubMode.htok } : {}),
+  };
   persistSession();
   safe(() => uiApi.setSelf?.(selfId));
   safe(() => uiApi.setRoomCode?.(roomCode));
@@ -497,9 +500,25 @@ function onErr(msg) {
   const pt = ERR_PT[msg.code] || msg.msg || 'Erro no servidor.';
   audioMod.sfx('error');
   if (hubMode) {
-    if (msg.code === 'CODE_TAKEN' && pending?.kind === 'create' && hubMode.room) {
-      // Sala já existe (tentativa repetida): entra nela em vez de falhar.
-      startJoin(hubMode.room, hubMode.color, { autoColor: true });
+    // Retentativa legítima do mesmo launch nunca recebe CODE_TAKEN (o
+    // servidor entra/resume direto pelo htok); CODE_TAKEN aqui é colisão real
+    // com outra partida → erro honesto, SEM join cego na sala alheia (R2).
+    if (msg.code === 'RECONNECT_EXPIRED' && pending?.kind === 'resume') {
+      // Sessão expirada: volta ao caminho normal (create/join sem resume).
+      clearSession();
+      const hub = pending.hub || hubMode;
+      pending = null;
+      if (hub.create) startCreate({ name: hub.name, color: hub.color || loadSettings().color, room: hub.room });
+      else startJoin(hub.room, hub.color, { autoColor: true });
+      return;
+    }
+    if (msg.code === 'NOT_FOUND' && pending?.kind === 'resume') {
+      // Sala sumiu (ex.: servidor reiniciou): create=1 recria; create=0 é erro.
+      clearSession();
+      const hub = pending.hub || hubMode;
+      pending = null;
+      if (hub.create) startCreate({ name: hub.name, color: hub.color || loadSettings().color, room: hub.room });
+      else failHub('A partida não existe mais no servidor.', pt);
       return;
     }
     if (msg.code === 'RECONNECT_EXPIRED') clearSession();
@@ -705,6 +724,7 @@ function resumeJoin() {
     name: session.name,
     color: session.color,
     resume: session.token,
+    ...(hubMode?.htok ? { htok: hubMode.htok } : {}),
   });
 }
 
@@ -753,7 +773,7 @@ async function startCreate(a) {
     else { pending = null; mode = 'home'; show('home'); toast('Sem conexão com o servidor.', 'err'); }
     return;
   }
-  net.send({ t: 'create', name, color, ...(a?.room ? { room: a.room } : {}) });
+  net.send({ t: 'create', name, color, ...(a?.room ? { room: a.room } : {}), ...(hubMode?.htok ? { htok: hubMode.htok } : {}) });
 }
 
 async function startJoin(code, color, opts = {}) {
@@ -784,7 +804,12 @@ async function startJoin(code, color, opts = {}) {
   }
   // No Hub, sem cor na URL: omite a cor e o servidor escolhe uma livre.
   const chosen = color || (opts.autoColor ? null : s.color);
-  net.send({ t: 'join', room: clean, name, ...(chosen ? { color: chosen } : {}) });
+  net.send({
+    t: 'join', room: clean, name,
+    ...(chosen ? { color: chosen } : {}),
+    ...(opts.resume ? { resume: opts.resume } : {}),
+    ...(hubMode?.htok ? { htok: hubMode.htok } : {}),
+  });
 }
 
 // ---------------------------------------------------------------- time trial
@@ -958,14 +983,43 @@ function boot() {
 
 async function bootHub(hub) {
   // O Hub já escolheu apelido/cor/sala: persiste p/ o fluxo normal e entra
-  // direto, sem home. create=1 honra o código pedido; create=0 entra nele.
+  // direto, sem home. Com sessão válida da mesma partida (room+name+token),
+  // retoma identidade/vaga via resume (R4); senão create/join normal.
   if (hub.name) saveSettings({ nickname: hub.name });
   if (hub.color) saveSettings({ color: hub.color });
+  const sess = readSession();
+  if (hubResumeAction(hub, sess).type === 'resume') {
+    startHubResume(hub, sess);
+    return;
+  }
   if (hub.create) {
     startCreate({ name: hub.name, color: hub.color || loadSettings().color, room: hub.room });
   } else {
     startJoin(hub.room, hub.color, { autoColor: true });
   }
+}
+
+// Resume no modo Hub: reanexa a mesma vaga (entra até em sala cheia) em vez
+// de criar/duplicar. Expirou (RECONNECT_EXPIRED) ou sala sumiu (NOT_FOUND) →
+// onErr volta ao caminho normal honesto.
+async function startHubResume(hub, sess) {
+  session = sess;
+  selfId = sess.id || null;
+  roomCode = sess.room;
+  pending = { kind: 'resume', hub };
+  mode = 'busy';
+  show('loading', { title: 'Reconectando…' });
+  const ok = await ensureConnected();
+  if (!ok) {
+    failHub('Sem conexão com o servidor.', 'Não foi possível abrir a partida.');
+    return;
+  }
+  net.send({
+    t: 'join', room: sess.room, name: sess.name,
+    ...(sess.color ? { color: sess.color } : {}),
+    resume: sess.token,
+    ...(hub.htok ? { htok: hub.htok } : {}),
+  });
 }
 
 async function autoResume(sess) {

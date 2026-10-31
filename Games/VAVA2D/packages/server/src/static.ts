@@ -81,8 +81,19 @@ export function createRequestHandler(
         res.end();
         return;
       }
-      if (rooms) rooms.close(code);
-      sendJson(res, 200, { ok: true });
+      // Fecha com identidade (R2): sala com dono (htok) só fecha com o mesmo
+      // htok do launch (`?htok=`); sem ele/diferente → 403 e a sala intacta.
+      // Sala sem dono (manual/legada) mantém o comportamento anterior.
+      const target = rooms ? rooms.get(code) : undefined;
+      if (target && target.hubOwner) {
+        const htok = String(url.searchParams.get('htok') ?? '');
+        if (htok !== target.hubOwner) {
+          sendJson(res, 403, { ok: false, error: 'FORBIDDEN' });
+          return;
+        }
+      }
+      const closed = rooms ? rooms.close(code, url.searchParams.get('htok')) : false;
+      sendJson(res, 200, { ok: true, closed });
       return;
     }
 

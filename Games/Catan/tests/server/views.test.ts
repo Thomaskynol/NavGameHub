@@ -83,6 +83,7 @@ describe('view de setup e pendências (motor real)', () => {
       code: 'ABCDE',
       name: 'Sala',
       hostPlayerId: 'p0',
+      hubToken: '',
       state,
       phase: state.phase,
       boardSeed: state.boardSeed,

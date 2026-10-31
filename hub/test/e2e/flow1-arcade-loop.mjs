@@ -1,7 +1,11 @@
 // F1: Arcade 2 clientes — criar, entrar (código), prontos, mesmo game code, finish, retorno.
+// PROOF: hooks — o fim da corrida é forçado via hook (não é partida jogada).
 import {
   HubClient, gameWs, wsNext, hubPost, gameCodeOf, uniqNick, delay, waitOnline,
+  E2E, proofLine,
 } from './e2e-helpers.mjs';
+
+proofLine('f1', 'hooks', 'transições Hub<->jogo; fim forçado por hook');
 
 const nickA = uniqNick('ArqA');
 const nickB = uniqNick('ArqB');
@@ -43,7 +47,7 @@ await waitOnline(A, 'arcade');
   if (!gameCode || gameCode.length !== 6) throw new Error('game code inválido');
 
   // Lado do jogo: A cria a sala no Arcade com o código do Hub; B entra.
-  arcadeA = await gameWs(8091);
+  arcadeA = await gameWs(E2E.arcadePort);
   arcadeA.send(JSON.stringify({ t: 'create', name: nickA, room: gameCode }));
   await wsNext(arcadeA, (m) => m.t === 'joined');
   console.log('[f1] sala criada no Arcade (lado jogo)');
@@ -56,13 +60,13 @@ await waitOnline(A, 'arcade');
   console.log(`[f1] playing: B create=0 gameCode=${gameCodeB}`);
   if (gameCodeB !== gameCode) throw new Error('game codes divergentes entre A e B');
 
-  arcadeB = await gameWs(8091);
+  arcadeB = await gameWs(E2E.arcadePort);
   arcadeB.send(JSON.stringify({ t: 'join', name: nickB, room: gameCode }));
   await wsNext(arcadeB, (m) => m.t === 'joined');
   console.log('[f1] B entrou na sala do Arcade (lado jogo)');
 
   // Force-finish via hook -> Hub finished -> graça (15s) -> lobby.
-  const fin = await hubPost(8091, '/__hub/test/finish', gameCode);
+  const fin = await hubPost(E2E.arcadePort, '/__hub/test/finish', gameCode);
   console.log(`[f1] hook finish: ${fin.status} ${JSON.stringify(fin.body)}`);
   if (fin.status !== 200) throw new Error('hook finish falhou (HUB_TEST_HOOKS?)');
 

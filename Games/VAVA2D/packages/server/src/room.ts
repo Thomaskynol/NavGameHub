@@ -131,6 +131,9 @@ function idleInput(aim: number): PlayerInput {
 
 export class Room {
   readonly code: string;
+  /** Dono da partida no modo Hub (contrato htok, R2): opaco, só comparado
+   *  por igualdade exata. null = sala manual/legada (sem dono). */
+  hubOwner: string | null = null;
   phase: Phase = 'waiting';
   timeLeft: number = MATCH.durationSeconds;
   winnerId: string | null = null;

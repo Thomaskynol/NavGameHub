@@ -36,6 +36,15 @@ function sanitizeRequestedCode(value: unknown): string | null {
   return code;
 }
 
+// Dono da partida (?htok= do launch do Hub): opaco, 1..64 chars
+// [A-Za-z0-9_-]; outro formato → null (sem dono). Só guardado e comparado.
+function sanitizeHtok(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const s = String(value).trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(s)) return null;
+  return s;
+}
+
 function sanitizeInput(value: unknown): PlayerInput | null {
   if (!isRecord(value)) return null;
   const seq = value.seq;
@@ -111,10 +120,19 @@ export class Session {
         if (requested) {
           const existing = this.rooms.get(requested);
           if (existing) {
+            // Contrato htok (R2): código ocupado + mesmo dono → retentativa
+            // legítima do mesmo launch (entra/resume, sem CODE_TAKEN).
+            // Dono diferente/ausente → CODE_TAKEN; o cliente Hub NÃO faz join
+            // cego (erro honesto) para não misturar grupos.
+            const htok = sanitizeHtok(parsed.htok);
+            if (existing.hubOwner && htok && existing.hubOwner === htok) {
+              this.joinRoom(existing, sanitizeName(parsed.name));
+              break;
+            }
             this.fail('Código de sala já está em uso. (CODE_TAKEN)');
             return;
           }
-          const room = this.rooms.createWithCode(requested);
+          const room = this.rooms.createWithCode(requested, sanitizeHtok(parsed.htok));
           if (!room) {
             this.fail('Código de sala já está em uso. (CODE_TAKEN)');
             return;

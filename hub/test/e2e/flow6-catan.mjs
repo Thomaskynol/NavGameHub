@@ -1,9 +1,18 @@
 // F6: Catan (min 3) — criar/entrar/prontos/iniciar via Hub, win via hook, retorno.
 // Lado do jogo via socket.io (mesmo protocolo do cliente Catan).
+// PROOF: hooks — o fim (win) é forçado via hook; criação/entrada/ready/start
+// seguem o protocolo normal do jogo (não é partida jogada até o fim).
 import { createRequire } from 'node:module';
-import { HubClient, hubPost, gameCodeOf, uniqNick, waitOnline } from './e2e-helpers.mjs';
+import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+import {
+  HubClient, hubPost, gameCodeOf, uniqNick, waitOnline,
+  E2E, REPO_ROOT, proofLine,
+} from './e2e-helpers.mjs';
 
-const requireCatan = createRequire('/home/thomaskyn/Documents/dev/Game_Hub/Games/Catan/package.json');
+proofLine('f6', 'hooks', 'protocolo Catan real; win forçado por hook');
+
+const requireCatan = createRequire(pathToFileURL(join(REPO_ROOT, 'Games', 'Catan', 'package.json')));
 const { io } = requireCatan('socket.io-client');
 
 let pass = true;
@@ -21,7 +30,7 @@ function lobby(socket, payload) {
 }
 function catanConnect() {
   return new Promise((resolve, reject) => {
-    const s = io('http://127.0.0.1:8093', { transports: ['websocket'], forceNew: true });
+    const s = io(E2E.gameBase(E2E.catanPort), { transports: ['websocket'], forceNew: true });
     s.on('connect', () => resolve(s));
     s.on('connect_error', reject);
   });
@@ -71,7 +80,7 @@ check('todos recebem o mesmo game code', codes.every((c) => c === gameCode), cod
 const playing = await hub[0].waitRoom((r) => r.phase === 'playing', 15000);
 check('Hub playing', playing.room.phase === 'playing');
 
-const win = await hubPost(8093, '/__hub/test/win', gameCode);
+const win = await hubPost(E2E.catanPort, '/__hub/test/win', gameCode);
 check('hook win catan', win.status === 200, `${win.status} ${JSON.stringify(win.body)}`);
 await hub[0].waitRoom((r) => r.phase === 'finished', 15000);
 check('Hub finished', true);

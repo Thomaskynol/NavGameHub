@@ -673,6 +673,7 @@ const ERROR_MESSAGES = {
   LAUNCHING: 'A partida está sendo preparada. Aguarde.',
   BAD_PHASE: 'Essa ação não é possível nesta fase da sala.',
   LAUNCH_FAILED: 'Não foi possível iniciar a partida. Tente novamente.',
+  GAME_FAILED: 'A partida foi interrompida: o servidor do jogo parou de responder. A sala voltou ao lobby.',
   RATE: 'Muitas ações em pouco tempo. Aguarde um instante.',
   INVALID: 'Não foi possível concluir a ação.'
 };
@@ -728,7 +729,7 @@ function handleServerError(message) {
     return;
   }
 
-  if (code === 'LAUNCH_FAILED') {
+  if (code === 'LAUNCH_FAILED' || code === 'GAME_FAILED') {
     state.launchFailed = true;
     toast(text, 'error');
     render();

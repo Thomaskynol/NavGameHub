@@ -57,6 +57,16 @@ function normalizeRequestedCode(raw) {
   return code;
 }
 
+// Token de dono da partida (htok): opaco, gerado pelo Hub e repassado no
+// launch (`?htok=`). O jogo só guarda e compara (igualdade exata) — nunca
+// interpreta. Inválido/ausente → null (sala sem dono: sem retry afiliado).
+function normalizeHtok(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(s)) return null;
+  return s;
+}
+
 export function createRooms({
   tracks,
   timings = {},
@@ -259,6 +269,16 @@ export function createRooms({
     const requested = normalizeRequestedCode(msg.room);
     if (requested === '') { sendErr(conn, 'INVALID', 'Código de sala inválido.'); return; }
     if (requested && rooms.has(requested)) {
+      // Contrato htok (R2): código ocupado + mesmo dono → retentativa legítima
+      // da mesma partida (retry/reload do launch): entra/resume em vez de
+      // CODE_TAKEN. Dono diferente/ausente → CODE_TAKEN; o cliente Hub NÃO
+      // faz join cego (erro honesto) para não misturar grupos.
+      const room = rooms.get(requested);
+      const htok = normalizeHtok(msg.htok);
+      if (room.htok && htok && room.htok === htok) {
+        handleJoin(conn, { ...msg, t: 'join', room: requested });
+        return;
+      }
       sendErr(conn, 'CODE_TAKEN', 'Código de sala já está em uso.'); return;
     }
     if (conn.room) leaveRoom(conn);
@@ -272,6 +292,9 @@ export function createRooms({
       players: [],
       race: null,
       seq: 0,
+      // Dono (htok) da partida quando criada a pedido do Hub; null = sem dono
+      // (sala manual/legada: sem retry afiliado, close só exige segredo do Hub).
+      htok: normalizeHtok(msg.htok),
     };
     rooms.set(code, room);
     const p = addPlayer(room, conn, name, color || pickFreeColor(room));

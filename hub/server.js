@@ -17,6 +17,8 @@ const DEFAULT_TIMINGS = {
   launchTimeout: 12_000,
   playPollInterval: 1_500,
   playNotFoundLimit: 3,
+  playErrorLimit: 6,
+  playErrorTimeout: 30_000,
   graceVava: 6_000,
   graceDefault: 15_000,
   closeDelay: 5_000,
@@ -74,6 +76,7 @@ const ERROR_MESSAGES = {
   LAUNCHING: 'A sala está iniciando uma partida. Tente novamente em instantes.',
   BAD_PHASE: 'Esta ação não é permitida na fase atual da sala.',
   LAUNCH_FAILED: 'Não foi possível iniciar a partida. Tente novamente.',
+  GAME_FAILED: 'A partida foi interrompida: o servidor do jogo parou de responder. A sala voltou ao lobby.',
   RATE: 'Muitas mensagens em pouco tempo. Aguarde um instante.',
   INVALID: 'Mensagem inválida.',
 };
@@ -116,7 +119,7 @@ export function createHub(options = {}) {
   const manifest = typeof options.manifest === 'string'
     ? loadManifest(options.manifest)
     : options.manifest || loadManifest();
-  const gamesList = manifest.games;
+  const gamesList = withEnvPorts(manifest.games);
   const games = new Map(gamesList.map((game) => [game.id, game]));
   const secret = options.secret || process.env.HUB_SECRET || randomBytes(32).toString('hex');
   const now = options.now || Date.now;
@@ -132,9 +135,15 @@ export function createHub(options = {}) {
   const playersByKey = new Map();
   const rooms = new Map();
   const health = new Map(gamesList.map((game) => [game.id, 'offline']));
-  const closeTimers = new Set();
+  // Fechamentos de partida pendentes sobrevivem à sala do Hub: a chave é
+  // gameId+gameCode+htok e a entrada vive aqui (fora da sala), executada no
+  // prazo ou imediatamente se a sala for destruída antes.
+  const pendingCloses = new Map();
+  // Lançamentos do mesmo jogo passam por um mutex (R2): a reserva do código
+  // é síncrona, e a verificação é serializada por gameId.
+  const launchLocks = new Map();
   let memberSeq = 0;
-  let hubPort = Number(manifest.hubPort) || 8090;
+  let hubPort = Number(process.env.HUB_PORT) || Number(manifest.hubPort) || 8090;
   let healthTimer = null;
   let healthChecking = false;
   let closing = false;
@@ -297,10 +306,9 @@ export function createHub(options = {}) {
   }
 
   function clearRoomTimers(room) {
-    for (const key of ['launchTimer', 'playTimer', 'graceTimer', 'closeTimer']) {
+    for (const key of ['launchTimer', 'playTimer', 'graceTimer']) {
       if (room[key]) {
         clearTimeout(room[key]);
-        if (key === 'closeTimer') closeTimers.delete(room[key]);
         room[key] = null;
       }
     }
@@ -308,20 +316,36 @@ export function createHub(options = {}) {
       clearTimeout(room.launch.timer);
       room.launch.timer = null;
     }
+    // Entradas de fechamento pendente vivem em pendingCloses (fora da sala)
+    // e NÃO são canceladas aqui: destroyRoom as executa imediatamente.
   }
 
   function destroyRoom(room) {
     if (rooms.get(room.code) !== room) return;
     rooms.delete(room.code);
-    const code = room.match && room.match.gameCode;
+    // Reserva ainda não verificada no jogo: nunca foi criada, nada a fechar.
+    const match = room.match && !room.match.reserved ? room.match : null;
     const game = games.get(room.gameId);
     clearRoomTimers(room);
+    // Fechamento pendente (R3): a sala do Hub sumiu, a partida do jogo pode
+    // continuar existindo — executa o close agora, com a identidade do launch.
+    if (room.closeKeys) {
+      for (const key of room.closeKeys) {
+        const entry = pendingCloses.get(key);
+        if (entry) {
+          pendingCloses.delete(key);
+          clearTimeout(entry.timer);
+          void closeGameRoom(entry.game, entry.gameCode, entry.htok);
+        }
+      }
+      room.closeKeys.clear();
+    }
     for (const member of room.members) {
       if (member.identity.roomCode === room.code) member.identity.roomCode = null;
     }
     room.members = [];
     // Sala sem ninguém não deve deixar partida órfã no servidor do jogo.
-    if (code) void closeGameRoom(game, code);
+    if (match) void closeGameRoom(game, match.gameCode, match.htok);
     broadcastCatalog();
   }
 
@@ -640,7 +664,7 @@ export function createHub(options = {}) {
       launchTimer: null,
       playTimer: null,
       graceTimer: null,
-      closeTimer: null,
+      closeKeys: new Set(),
     };
     const member = {
       id: identity.id,
@@ -703,7 +727,38 @@ export function createHub(options = {}) {
     if (room.phase === 'playing' && role === 'player' && room.match) {
       sendPlay(member, room, false);
     }
+    // Entrada tardia com jogo ainda no pregame (R5): o estado efetivo do jogo
+    // decide — lobby + joinable + vaga → player com play; senão, waiting.
+    if (room.phase === 'playing' && role === 'waiting' && room.match && game) {
+      void reevaluateLateJoin(room, game, member, room.match);
+    }
     maybeAutoStart(room);
+  }
+
+  // Reavalia uma entrada tardia contra o estado efetivo do jogo. Se a partida
+  // ainda estiver no lobby/pregame e aceitar jogadores, promove a waiting
+  // para player e envia play (join); senão mantém waiting.
+  async function reevaluateLateJoin(room, game, member, match) {
+    let state = null;
+    try {
+      state = await fetchGameState(game, match.gameCode);
+    } catch {
+      state = { kind: 'error' };
+    }
+    if (!rooms.has(room.code) || room.phase !== 'playing' || room.match !== match) return;
+    if (!memberOf(room, member.identity)) return;
+    if (member.role !== 'waiting') return;
+    if (!state || state.kind !== 'exists' || !state.room) return;
+    if (state.room.phase !== 'lobby' || state.room.joinable !== true) return;
+    if (
+      Number.isFinite(state.room.players)
+      && Number.isFinite(state.room.capacity)
+      && state.room.players >= state.room.capacity
+    ) return;
+    if (room.members.length > room.capacity) return;
+    member.role = 'player';
+    sendPlay(member, room, false);
+    roomChanged(room);
   }
 
   function handleLeaveRoom(ws) {
@@ -812,11 +867,62 @@ export function createHub(options = {}) {
     const game = games.get(room.gameId);
     if (!game || health.get(game.id) !== 'online') return false;
     if (room.capacity < game.minPlayers) return false;
+    // Política conservadora (R6): enquanto um jogador ainda ocupar vaga sem
+    // estar conectado (graça de desconexão), não inicia — mesmo que os
+    // conectados estejam todos prontos. Reavaliado na saída/expiração.
+    if (room.members.some((m) => m.role === 'player' && !m.connected)) return false;
     const connectedPlayers = room.members.filter((m) => m.role === 'player' && m.connected);
     if (connectedPlayers.length < game.minPlayers) return false;
     if (!connectedPlayers.every((m) => m.ready)) return false;
     beginLaunch(room, game);
     return true;
+  }
+
+  function acquireLaunchLock(gameId) {
+    const entry = launchLocks.get(gameId);
+    if (!entry || !entry.locked) {
+      launchLocks.set(gameId, { locked: true, queue: [] });
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      entry.queue.push(resolve);
+    });
+  }
+
+  function releaseLaunchLock(gameId) {
+    const entry = launchLocks.get(gameId);
+    if (!entry) return;
+    const next = entry.queue.shift();
+    if (next) {
+      next();
+    } else {
+      launchLocks.delete(gameId);
+    }
+  }
+
+  // Reserva síncrona do código (R2): gera e marca room.match ANTES de qualquer
+  // await, então dois lançamentos simultâneos nunca recebem o mesmo código —
+  // gameCodeInUse enxerga a reserva. Retorna o candidato ou null.
+  function reserveLaunchCode(room, game) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const candidate = generateGameCode(game);
+      if (gameCodeInUse(candidate, game.id, room.code)) continue;
+      const htok = (room.match && room.match.htok) || randomBytes(16).toString('hex');
+      const connectedPlayers = room.members.filter((m) => m.role === 'player' && m.connected);
+      room.match = {
+        gameCode: candidate,
+        htok,
+        startedAt: now(),
+        joinable: !!game.midMatchJoin,
+        expect: Math.max(1, connectedPlayers.length),
+        notFound: 0,
+        errors: 0,
+        errorSince: null,
+        reserved: true,
+      };
+      return candidate;
+    }
+    return null;
   }
 
   function beginLaunch(room, game) {
@@ -829,6 +935,10 @@ export function createHub(options = {}) {
       code: null,
       timer: null,
     };
+    if (!reserveLaunchCode(room, game)) {
+      failLaunch(room);
+      return;
+    }
     roomChanged(room);
     void runLaunch(room, game).catch((error) => {
       logAt('error', '[hub] falha no lançamento:', error);
@@ -836,42 +946,33 @@ export function createHub(options = {}) {
     });
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function runLaunch(room, game) {
+    // Serializa lançamentos por jogo (R2): a verificação do código reservado
+    // contra o servidor do jogo acontece com exclusão mútua por gameId.
+    await acquireLaunchLock(game.id);
+    try {
+      await verifyLaunchCode(room, game);
+    } finally {
+      releaseLaunchLock(game.id);
+    }
+    if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
+    if (room.match.failed) {
+      failLaunch(room);
+      return;
+    }
+    room.match.reserved = false;
+
     const creator = pickLaunchCreator(room);
     if (!creator) {
       failLaunch(room);
       return;
     }
     room.launch.creatorId = creator.id;
-
-    let code = null;
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const candidate = generateGameCode(game);
-      if (gameCodeInUse(candidate, game.id, room.code)) continue;
-      const state = await fetchGameState(game, candidate);
-      if (!rooms.has(room.code) || room.phase !== 'launching') return;
-      if (state.kind === 'error') {
-        failLaunch(room);
-        return;
-      }
-      if (state.kind === 'free') {
-        code = candidate;
-        break;
-      }
-    }
-    if (!code) {
-      failLaunch(room);
-      return;
-    }
-
-    const connectedPlayers = room.members.filter((m) => m.role === 'player' && m.connected);
-    room.match = {
-      gameCode: code,
-      startedAt: now(),
-      joinable: !!game.midMatchJoin,
-      expect: Math.max(1, connectedPlayers.length),
-      notFound: 0,
-    };
+    const code = room.match.gameCode;
     room.launch.code = code;
 
     let creatorMember = memberOf(room, creator);
@@ -886,6 +987,32 @@ export function createHub(options = {}) {
     sendPlay(creatorMember, room, true);
     roomChanged(room);
     scheduleLaunchPoll(room, game, code);
+  }
+
+  // Confirma que o código reservado está livre no servidor do jogo. Em
+  // colisão (sala existe), reserva outro candidato — ainda sob o mutex.
+  // Erro de rede/timeout é tolerado aqui (tenta de novo até o prazo); se
+  // esgotar as tentativas, marca falha para failLaunch fora do mutex.
+  async function verifyLaunchCode(room, game) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
+      if (now() >= room.launch.deadline) {
+        room.match.failed = true;
+        return;
+      }
+      const state = await fetchGameState(game, room.match.gameCode);
+      if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
+      if (state.kind === 'free') return;
+      if (state.kind === 'exists') {
+        if (!reserveLaunchCode(room, game)) {
+          room.match.failed = true;
+          return;
+        }
+        continue;
+      }
+      await sleep(timings.launchPollInterval);
+    }
+    if (room.match) room.match.failed = true;
   }
 
   function pickLaunchCreator(room) {
@@ -905,8 +1032,13 @@ export function createHub(options = {}) {
       }
       const state = await fetchGameState(game, code);
       if (!rooms.has(room.code) || room.phase !== 'launching') return;
+      // Erro transitório não encerra o lançamento: continua até o prazo (R8).
       if (state.kind === 'error') {
-        failLaunch(room);
+        if (now() >= room.launch.deadline) {
+          failLaunch(room);
+          return;
+        }
+        room.launchTimer = setTimeout(tick, timings.launchPollInterval);
         return;
       }
       if (state.kind === 'exists') {
@@ -954,15 +1086,45 @@ export function createHub(options = {}) {
     logAt('warn', `[hub] lançamento da sala ${room.code} falhou.`);
   }
 
+  // Falha persistente do servidor do jogo (R8): marca a sala como FALHA com
+  // mensagem clara (não como fim normal) e devolve o grupo a um lobby
+  // utilizável. Um erro transitório isolado nunca encerra nada.
+  function failMatch(room, game) {
+    if (!rooms.has(room.code) || room.phase !== 'playing' || !room.match) return;
+    if (room.playTimer) {
+      clearTimeout(room.playTimer);
+      room.playTimer = null;
+    }
+    const code = room.match.gameCode;
+    const htok = room.match.htok || null;
+    room.phase = 'lobby';
+    room.match = null;
+    resetReadiness(room);
+    for (const member of room.members) {
+      if (member.role === 'waiting') member.role = 'player';
+    }
+    for (const member of room.members) {
+      if (member.connected && member.identity.conn) {
+        send(member.identity.conn, { t: 'error', code: 'GAME_FAILED', message: errorMessage('GAME_FAILED') });
+      }
+    }
+    roomChanged(room);
+    logAt('warn', `[hub] partida da sala ${room.code} falhou (jogo sem resposta).`);
+    if (code) scheduleClose(room, game, code, htok);
+  }
+
   function schedulePlayingPoll(room, game) {
     if (!room.match) return;
     room.match.notFound = 0;
+    room.match.errors = 0;
+    room.match.errorSince = null;
     const tick = async () => {
       room.playTimer = null;
       if (!rooms.has(room.code) || room.phase !== 'playing' || !room.match) return;
       const state = await fetchGameState(game, room.match.gameCode);
       if (!rooms.has(room.code) || room.phase !== 'playing' || !room.match) return;
       if (state.kind === 'free') {
+        room.match.errors = 0;
         room.match.notFound += 1;
         if (room.match.notFound >= timings.playNotFoundLimit) {
           finishRoom(room, game);
@@ -970,6 +1132,8 @@ export function createHub(options = {}) {
         }
       } else if (state.kind === 'exists') {
         room.match.notFound = 0;
+        room.match.errors = 0;
+        room.match.errorSince = null;
         if (state.room && typeof state.room.joinable === 'boolean') {
           const changed = room.match.joinable !== state.room.joinable;
           room.match.joinable = state.room.joinable;
@@ -977,6 +1141,15 @@ export function createHub(options = {}) {
         }
         if (state.room && (state.room.phase === 'results' || state.room.phase === 'ended')) {
           finishRoom(room, game);
+          return;
+        }
+      } else {
+        room.match.errors += 1;
+        if (room.match.errorSince === null) room.match.errorSince = now();
+        const persistent = room.match.errors >= timings.playErrorLimit
+          || (now() - room.match.errorSince) >= timings.playErrorTimeout;
+        if (persistent) {
+          failMatch(room, game);
           return;
         }
       }
@@ -1000,6 +1173,7 @@ export function createHub(options = {}) {
       room.graceTimer = null;
       if (!rooms.has(room.code) || room.phase !== 'finished') return;
       const code = room.match ? room.match.gameCode : null;
+      const htok = room.match && room.match.htok ? room.match.htok : null;
       room.phase = 'lobby';
       room.match = null;
       resetReadiness(room);
@@ -1007,18 +1181,28 @@ export function createHub(options = {}) {
         if (member.role === 'waiting') member.role = 'player';
       }
       roomChanged(room);
-      if (code) scheduleClose(room, game, code);
+      if (code) scheduleClose(room, game, code, htok);
     }, grace);
   }
 
-  function scheduleClose(room, game, code) {
+  function pendingCloseKey(game, code, htok) {
+    return `${game.id}:${code}:${htok || ''}`;
+  }
+
+  // Agenda o fechamento da partida no servidor do jogo. A entrada vive em
+  // pendingCloses (fora da sala): sobrevive à destruição da sala do Hub e é
+  // executada imediatamente nesse caso (R3). Repetida e idempotente.
+  function scheduleClose(room, game, code, htok) {
+    const key = pendingCloseKey(game, code, htok);
+    if (pendingCloses.has(key)) return key;
     const timer = setTimeout(() => {
-      closeTimers.delete(timer);
-      if (room.closeTimer === timer) room.closeTimer = null;
-      void closeGameRoom(game, code);
+      pendingCloses.delete(key);
+      if (room.closeKeys) room.closeKeys.delete(key);
+      void closeGameRoom(game, code, htok);
     }, timings.closeDelay);
-    closeTimers.add(timer);
-    room.closeTimer = timer;
+    pendingCloses.set(key, { timer, game, gameCode: code, htok });
+    if (room.closeKeys) room.closeKeys.add(key);
+    return key;
   }
 
   // ---------- URLs e chamadas aos jogos ----------
@@ -1053,6 +1237,9 @@ export function createHub(options = {}) {
       slot: String(slot),
       hubUrl: roomUrl,
     });
+    // Token opaco do launch (R2): o jogo guarda como dono da partida para
+    // diferenciar retentativa legítima de colisão e conferir o fechamento.
+    if (room.match.htok) params.set('htok', room.match.htok);
     return `${base}?${params.toString()}`;
   }
 
@@ -1080,23 +1267,38 @@ export function createHub(options = {}) {
     }
   }
 
-  async function closeGameRoom(game, code) {
+  async function closeGameRoom(game, code, htok) {
     if (!game || !code) return;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timings.stateTimeout);
+    const sendOnce = async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timings.stateTimeout);
+      try {
+        const params = new URLSearchParams({ room: code });
+        // Identidade do launch (R2): o jogo só fecha se o dono conferir —
+        // protege reutilização do código por outra partida.
+        if (htok) params.set('htok', htok);
+        await fetch(
+          `${gameBaseUrl(game)}/__hub/close?${params.toString()}`,
+          {
+            method: 'POST',
+            headers: { 'x-hub-secret': secret },
+            signal: controller.signal,
+          },
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+    };
     try {
-      await fetch(
-        `${gameBaseUrl(game)}/__hub/close?room=${encodeURIComponent(code)}`,
-        {
-          method: 'POST',
-          headers: { 'x-hub-secret': secret },
-          signal: controller.signal,
-        },
-      );
+      await sendOnce();
     } catch {
-      // O jogo pode já ter encerrado a partida; a limpeza é best-effort.
-    } finally {
-      clearTimeout(timer);
+      // Uma falha isolada não derruba a limpeza: tenta de novo uma vez.
+      await sleep(200);
+      try {
+        await sendOnce();
+      } catch {
+        // O jogo pode já ter encerrado a partida; a limpeza é best-effort.
+      }
     }
   }
 
@@ -1383,8 +1585,12 @@ export function createHub(options = {}) {
       clearInterval(healthTimer);
       healthTimer = null;
     }
-    for (const timer of closeTimers) clearTimeout(timer);
-    closeTimers.clear();
+    // Descarrega fechamentos pendentes (best-effort, sem aguardar a rede).
+    for (const [key, entry] of pendingCloses) {
+      pendingCloses.delete(key);
+      clearTimeout(entry.timer);
+      void closeGameRoom(entry.game, entry.gameCode, entry.htok);
+    }
     for (const room of rooms.values()) clearRoomTimers(room);
     rooms.clear();
     for (const identity of players) {
@@ -1441,6 +1647,7 @@ export function createHub(options = {}) {
         })),
         match: room.match ? {
           gameCode: room.match.gameCode,
+          htok: room.match.htok || null,
           startedAt: room.match.startedAt,
           joinable: !!room.match.joinable,
           expect: room.match.expect,
@@ -1453,6 +1660,22 @@ export function createHub(options = {}) {
 }
 
 // ---------- helpers fora do hub ----------
+
+// Portas efetivas (R7): HUB_PORT/ARCADE_PORT/VAVA_PORT/CATAN_PORT no ambiente
+// prevalecem sobre o manifesto; usa-se em URLs, sondas (health) e catálogo.
+// Nome genérico por jogo: <ID-MAIUSCULO>_PORT. Inválida/ausente → manifesto.
+function envPort(name) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 && value < 65536 ? value : null;
+}
+
+function withEnvPorts(games) {
+  return (games || []).map((game) => {
+    const override = game && game.id ? envPort(`${String(game.id).toUpperCase()}_PORT`) : null;
+    if (override === null) return game;
+    return { ...game, port: override };
+  });
+}
 
 function hostFromHeader(value) {
   if (!value) return '127.0.0.1';

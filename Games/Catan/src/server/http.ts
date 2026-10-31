@@ -106,7 +106,10 @@ function attachHubRoutes(app: Express, ctx: AppContext): void {
 
   app.post('/__hub/close', (req, res) => {
     if (!guard(req, res)) return;
-    closeHubRoom(ctx, roomParam(req));
+    // htok: dono da instância (query ?htok=). Só fecha se conferir; fechamento
+    // tardio de partida antiga nunca atinge partida nova que reutilizou o código.
+    const htok = typeof req.query.htok === 'string' ? req.query.htok : undefined;
+    closeHubRoom(ctx, roomParam(req), htok);
     res.json({ ok: true });
   });
 

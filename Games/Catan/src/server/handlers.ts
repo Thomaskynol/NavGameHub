@@ -10,6 +10,7 @@ import type { EngineError, EngineResult, GameState, RandomSource } from '../shar
 import type { GameEngineApi } from './engine';
 import {
   deleteMember,
+  deleteRoomData,
   findProcessed,
   insertChatRow,
   insertMember,
@@ -204,10 +205,66 @@ async function handleLobby(ctx: AppContext, socket: AppSocket, raw: unknown, ack
         return;
       }
       // Código solicitado (Hub): colisão => CODE_TAKEN, nunca gera outro em silêncio.
+      // Identidade (htok): mesmo dono => retentativa legítima entra na sala
+      // existente (nova vaga, sem CODE_TAKEN); dono diferente/ausente => CODE_TAKEN
+      // honesto e o cliente NÃO faz join cego.
       let code: string;
       const requested = payload.roomCode?.toUpperCase().trim();
+      const hubToken = (payload.hubToken ?? '').trim();
       if (requested) {
-        if (ctx.store.rooms.has(requested) || roomCodeExists(ctx.db, requested)) {
+        const existing = ctx.store.getOpenRoom(requested);
+        if (existing) {
+          if (hubToken !== '' && existing.hubToken !== '' && hubToken === existing.hubToken) {
+            if (existing.state !== null || existing.phase !== 'lobby') {
+              ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.ALREADY_STARTED, 'A partida já começou.') });
+              return;
+            }
+            if (existing.members.size >= MAX_PLAYERS) {
+              ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.ROOM_FULL, 'Sala cheia.') });
+              return;
+            }
+            const color = ctx.store.freeColor(existing);
+            if (!color) {
+              ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.ROOM_FULL, 'Sala cheia.') });
+              return;
+            }
+            const retryPlayerId = newPlayerId();
+            const retryRecovery = generateRecoveryCode();
+            const retryNow = Date.now();
+            const retryMember: Member = {
+              playerId: retryPlayerId,
+              name: payload.nickname,
+              color,
+              recoveryHash: hashRecovery(retryRecovery),
+              isHost: false,
+              ready: false,
+              joinedAt: retryNow,
+              connected: true,
+            };
+            tx(ctx.db, () =>
+              insertMember(ctx.db, {
+                roomCode: existing.code,
+                playerId: retryPlayerId,
+                name: retryMember.name,
+                color,
+                recoveryHash: retryMember.recoveryHash,
+                isHost: false,
+                ready: false,
+                joinedAt: retryNow,
+              }),
+            );
+            ctx.store.indexMember(existing, retryMember);
+            bindSocket(ctx, socket, existing.code, retryPlayerId);
+            logInfo('room_rejoined_htok', { roomCode: existing.code, players: existing.members.size });
+            emitPresence(ctx, existing, retryPlayerId, true);
+            broadcastRoom(ctx, existing);
+            ack({ ok: true, session: sessionPayload(existing, retryMember, retryRecovery), view: null });
+            return;
+          }
+          ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.CODE_TAKEN, 'Código de sala já está em uso.') });
+          return;
+        }
+        if (roomCodeExists(ctx.db, requested)) {
           ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.CODE_TAKEN, 'Código de sala já está em uso.') });
           return;
         }
@@ -239,6 +296,7 @@ async function handleLobby(ctx: AppContext, socket: AppSocket, raw: unknown, ack
         code,
         name: payload.roomName ?? `Sala de ${payload.nickname}`,
         hostPlayerId: playerId,
+        hubToken,
         state: null,
         phase: 'lobby',
         boardSeed: '',
@@ -250,7 +308,7 @@ async function handleLobby(ctx: AppContext, socket: AppSocket, raw: unknown, ack
         test: { forceDice: null, rngSeed: null, rng: null },
       };
       tx(ctx.db, () => {
-        insertRoom(ctx.db, { code, name: room.name, hostPlayerId: playerId, phase: 'lobby', version: 0, boardSeed: '', createdAt: now });
+        insertRoom(ctx.db, { code, name: room.name, hostPlayerId: playerId, phase: 'lobby', version: 0, boardSeed: '', createdAt: now, hubToken });
         insertMember(ctx.db, {
           roomCode: code,
           playerId,
@@ -454,9 +512,10 @@ function runLobbyMutation(ctx: AppContext, socket: AppSocket, room: Room, member
       ctx.store.unindexMember(room, member);
       unbindSocket(ctx, socket);
       if (room.members.size === 0) {
+        // Sala vazia: remove por completo e libera o código para reutilização
+        // segura (a identidade htok protege contra fechamento tardio).
         tx(ctx.db, () => {
-          deleteMember(ctx.db, room.code, member.playerId);
-          persistRoomUpdate(ctx.db, { roomCode: room.code, closed: true, updatedAt: Date.now() });
+          deleteRoomData(ctx.db, room.code);
         });
         ctx.store.rooms.delete(room.code);
         logInfo('room_closed', { roomCode: room.code });
@@ -682,11 +741,19 @@ function runHook(ctx: AppContext, room: Room, hook: HookCommand): CommandRespons
 
 // ---------- Hub (hub/PROTOCOLO.md) ----------
 
-/** Fecha a sala a pedido do Hub (POST /__hub/close). Idempotente. */
-export function closeHubRoom(ctx: AppContext, rawCode: string): void {
+/** Fecha a sala a pedido do Hub (POST /__hub/close). Idempotente.
+ * Com htok (dono da instância): só fecha se o token conferir; fechamento
+ * tardio de uma partida antiga nunca atinge a partida nova que reutilizou o
+ * código. Sem dono (legado, hubToken ''): fecha como antes. */
+export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknown): void {
   const code = String(rawCode ?? '').toUpperCase().trim();
   const room = ctx.store.rooms.get(code);
   if (!room) return;
+  // shortcut: sala sem dono fecha direto; com dono exige o token da instância.
+  if (room.hubToken !== '') {
+    const provided = typeof rawToken === 'string' ? rawToken.trim() : '';
+    if (provided !== room.hubToken) return;
+  }
   tx(ctx.db, () => {
     for (const member of room.members.values()) {
       const key = sessionKey(room.code, member.playerId);
@@ -697,9 +764,8 @@ export function closeHubRoom(ctx: AppContext, rawCode: string): void {
         socket.emit('session_replaced', { by: member.playerId });
       }
       ctx.store.unindexMember(room, member);
-      deleteMember(ctx.db, room.code, member.playerId);
     }
-    persistRoomUpdate(ctx.db, { roomCode: room.code, closed: true, updatedAt: Date.now() });
+    deleteRoomData(ctx.db, room.code);
   });
   ctx.store.rooms.delete(room.code);
   logInfo('hub_room_closed', { roomCode: room.code });
