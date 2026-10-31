@@ -106,9 +106,9 @@ Hub → cliente:
 
 1. Todos prontos → `launching`. O Hub gera um `htok` (token opaco, 16 bytes hex, único por sala+launch) e **reserva sincronamente** um código de sala do jogo (alfabeto `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, tamanho do jogo), marcando `room.match` **antes** de qualquer I/O — dois lançamentos simultâneos nunca recebem o mesmo código. Lançamentos do mesmo jogo são ainda serializados por um mutex por `gameId` (R2).
 2. O criador (anfitrião conectado ou membro conectado mais antigo) recebe `play` com `create=1`.
-3. O Hub consulta o estado do jogo a cada 300 ms por até 12 s. Quando a sala existe, envia `play` com `create=0` aos demais membros conectados e passa a `playing`. Erro transitório de rede durante o lançamento não falha na hora: tenta até o prazo (R8).
+3. O Hub consulta o estado do jogo a cada 300 ms por até 12 s. Quando a sala existe **e o dono confere (`hubOwner === htok` do launch)**, envia `play` com `create=0` aos demais membros conectados e passa a `playing`. Sala existente com outro dono (ou sem dono) é **CONFLITO**: o Hub nunca envia `play` para lá nem a considera `playing` válida — reserva um novo código, reemite `play create=1` ao criador e tenta de novo (até ~3 novos códigos). Esgotado o limite, a sala volta ao `lobby` com `LAUNCH_CONFLICT` (mensagem clara), sem prender o grupo. Erro transitório de rede durante o lançamento não falha na hora: tenta até o prazo (R8).
 4. A interface do Hub abre o jogo em iframe e mantém uma barra com código, nome do jogo e “Voltar à sala”.
-5. O Hub consulta `GET /__hub/state` a cada 1,5 s. `results`/`ended` → `finished`; 404 por três consultas seguidas também encerra. Erro persistente (`state.kind === 'error'` em N consultas seguidas ou por mais de um tempo limite, configurável) → **FALHA**: a sala recebe `GAME_FAILED` (mensagem clara, nunca como fim normal) e volta a `lobby` utilizável; um erro isolado nunca encerra nada (R8).
+5. O Hub consulta `GET /__hub/state` a cada 1,5 s. `results`/`ended` → `finished`; 404 por três consultas seguidas também encerra. Em todo poll o Hub confere o dono: sala existente com `hubOwner` divergente conta como ausência (nunca adota a sala alheia) até encerrar pelo fluxo normal. Erro persistente (`state.kind === 'error'` em N consultas seguidas ou por mais de um tempo limite, configurável) → **FALHA**: a sala recebe `GAME_FAILED` (mensagem clara, nunca como fim normal) e volta a `lobby` utilizável; um erro isolado nunca encerra nada (R8).
 6. Depois da graça, o Hub remove o iframe, volta ao lobby e chama `POST /__hub/close` após 5 s — com o `htok` do launch (R3).
 
 Parâmetros passados ao jogo (todos URL-encoded):
@@ -130,11 +130,14 @@ Cabeçalho obrigatório: `x-hub-secret: <HUB_SECRET>`. Sem segredo correto → `
 ```js
 { ok: true, room: {
   code, phase: 'lobby'|'playing'|'results',
-  players, capacity, joinable, startedAt?
+  players, capacity, joinable, startedAt?,
+  hubOwner: string | null
 } }
 ```
 
 Sala inexistente → `404 { ok:false, error:'NOT_FOUND' }`.
+
+`hubOwner` é o dono da partida (o `htok` do launch que criou a sala; `null` quando a sala não tem dono — manual/legada). O Hub confere `hubOwner === htok` esperado após o create e em todo poll: divergência (outro dono ou `null`) = CONFLITO (nunca envia `play` para lá, nunca considera `playing` válido, nunca fecha a sala alheia; tenta novo código até o limite, depois `LAUNCH_CONFLICT`). Transição: jogos que ainda não informam a chave são aceitos provisoriamente como próprios; com a chave presente a conferência é estrita.
 
 Mapeamento:
 - Arcade: `lobby → lobby`, `countdown|race → playing`, `results → results`; `joinable = status === 'lobby'`; `players = room.players.length`.
@@ -147,6 +150,8 @@ Remove a sala do jogo e libera recursos. Idempotente. Responde `{ ok:true }`.
 
 Com dono (`htok` guardado na criação): só fecha se o `htok` conferir; divergente/ausente → `403 { ok:false, error:'FORBIDDEN' }` e a sala segue intacta — protege reutilização do código por outra partida (R2). Sala sem dono (manual/legada) fecha livremente.
 
+Do lado do Hub: `403`/`409` no close significam "não é minha" — o Hub registra o resultado (últimos fechamentos expostos no diagnóstico interno), **não insiste** (sem retry destrutivo) e nunca trata como fechado. Só conta como fechado `200 { closed:true }`.
+
 O fechamento pendente sobrevive à destruição da sala do Hub: fica numa fila fora da sala (identidade `gameId`+`gameCode`+`htok`) e é executado imediatamente se a sala for destruída antes do prazo; partidas sucessivas fecham cada uma com seu `htok` (R3). Falha de rede no close não derruba a limpeza (uma nova tentativa; depois best-effort).
 
 ### Códigos de sala solicitados e dono da partida (R2)
@@ -155,7 +160,7 @@ O fechamento pendente sobrevive à destruição da sala do Hub: fica numa fila f
 - Catan: `create_room` aceita `roomCode` opcional (6 caracteres) e `htok` opcional. Ocupado → `CODE_TAKEN`, salvo retentativa legítima do mesmo dono.
 - VAVA: `create` aceita `code` opcional (4 caracteres) e `htok` opcional. Mesma regra: mesmo dono entra/resume; outro dono → `CODE_TAKEN`.
 
-Em todos: o jogo guarda o `htok` como dono opaco (só compara por igualdade; formato `1..64` chars `[A-Za-z0-9_-]`, senão sem dono), nunca gera outro código em silêncio, e o cliente do Hub nunca faz join cego após `CODE_TAKEN` de outra partida.
+Em todos: o jogo guarda o `htok` como dono opaco (só compara por igualdade; formato `1..64` chars `[A-Za-z0-9_-]`, senão sem dono), retorna o dono em `hubOwner` no state, nunca gera outro código em silêncio, e o cliente do Hub nunca faz join cego após `CODE_TAKEN` de outra partida.
 
 ### Hooks de teste (somente com `HUB_TEST_HOOKS=1`)
 
@@ -167,6 +172,6 @@ Sem a variável, os hooks respondem 404. Eles existem apenas para testes automat
 
 ## Erros do Hub
 
-`BAD_NICK`, `NICK_TAKEN`, `BAD_GAME`, `GAME_OFFLINE`, `BAD_CAPACITY`, `CAPACITY_GT_MAX`, `CAPACITY_LT_OCCUPANCY`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_IN_MATCH`, `NOT_HOST`, `NOT_IN_ROOM`, `NOT_READY`, `LAUNCHING`, `BAD_PHASE`, `LAUNCH_FAILED`, `GAME_FAILED`, `RATE`, `INVALID`.
+`BAD_NICK`, `NICK_TAKEN`, `BAD_GAME`, `GAME_OFFLINE`, `BAD_CAPACITY`, `CAPACITY_GT_MAX`, `CAPACITY_LT_OCCUPANCY`, `ROOM_NOT_FOUND`, `ROOM_FULL`, `ALREADY_IN_MATCH`, `NOT_HOST`, `NOT_IN_ROOM`, `NOT_READY`, `LAUNCHING`, `BAD_PHASE`, `LAUNCH_FAILED`, `LAUNCH_CONFLICT`, `GAME_FAILED`, `RATE`, `INVALID`.
 
 Mensagens em português, claras e específicas. A interface mostra o motivo e não altera o estado local de forma otimista quando o servidor rejeitar.

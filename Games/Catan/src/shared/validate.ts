@@ -198,7 +198,21 @@ export function validateLobbyCommand(p: unknown): { ok: true; value: LobbyComman
       if (![...code].every((ch) => ROOM_CODE_ALPHABET.includes(ch))) return { ok: false, error: invalid('Código da sala inválido') };
       const n = checkString(p.nickname, NICKNAME_MAX_LENGTH, 'Apelido');
       if (n) return { ok: false, error: invalid(n) };
-      return { ok: true, value: { type: t, code, nickname: String(p.nickname) } };
+      // Dono (htok) opcional no join: quando informado, precisa conferir com o
+      // dono da sala; divergente (ou sala sem dono) => CODE_TAKEN no handler,
+      // sem entrada. Ausente => legado preservado (entra como antes).
+      let hubToken: string | undefined;
+      if (p.hubToken !== undefined) {
+        if (typeof p.hubToken !== 'string') return { ok: false, error: invalid('Token do Hub inválido') };
+        const t = p.hubToken.trim();
+        if (t.length === 0 || t.length > 128 || !/^[A-Za-z0-9\-_]+$/.test(t)) {
+          return { ok: false, error: invalid('Token do Hub inválido') };
+        }
+        hubToken = t;
+      }
+      const value: Extract<LobbyCommand, { type: 'join_room' }> = { type: t, code, nickname: String(p.nickname) };
+      if (hubToken !== undefined) value.hubToken = hubToken;
+      return { ok: true, value };
     }
     case 'bind_session': {
       const c = checkString(p.code, 16, 'Código da sala');

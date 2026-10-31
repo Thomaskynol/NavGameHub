@@ -5,7 +5,10 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import WebSocket from 'ws';
 
-const VAVA_ROOT = '/home/thomaskyn/Documents/dev/Game_Hub/Games/VAVA2D';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const VAVA_ROOT = path.join(REPO_ROOT, 'Games', 'VAVA2D');
 const SECRET = 'vava-htok-test-secret';
 
 async function freePort() {

@@ -2,6 +2,13 @@
 // Contrato: ARCHITECTURE.md §3 (protocolo) e §4 (autoridade de corrida — só a
 // parte de salas nesta fase; a corrida é injetada via raceFactory).
 //
+// Decisão de compatibilidade (modo independente preservado): join/create SEM
+// htok seguem as regras legadas — inclusive ENTRAR em sala com dono. Só join
+// COM htok apresentado é afiliado ao Hub e exige dono igual (dono diferente
+// ou sala sem dono → CODE_TAKEN, sem entrada). Isso mantém o uso independente
+// fora do Hub exatamente como antes; o isolamento entre partidas do Hub é
+// garantido porque o cliente Hub sempre apresenta o htok do launch.
+//
 // API pública:
 //   createRooms({ tracks, timings?, now?, raceFactory?, log? }) => {
 //     handleMessage(conn, msg),  // conn = { id, send(obj), close() }
@@ -308,6 +315,20 @@ export function createRooms({
     const code = String(msg.room ?? '').toUpperCase();
     const room = rooms.get(code);
     if (!room) { sendErr(conn, 'NOT_FOUND', 'Sala não encontrada.'); return; }
+
+    // Guarda de dono (Hub): join COM htok só entra com dono igual. Dono
+    // diferente ou sala sem dono → CODE_TAKEN, SEM entrada (impede que o
+    // jogador caia na sala alheia na corrida verificação→criação). Sem htok
+    // → regras legadas (modo independente preservado, inclusive em sala
+    // com dono). Resume legítimo (mesmo htok + token válido) passa aqui e
+    // entra até em sala cheia pelo caminho de resume abaixo.
+    const htok = normalizeHtok(msg.htok);
+    if (htok) {
+      if (!room.htok || room.htok !== htok) {
+        sendErr(conn, 'CODE_TAKEN', 'Código de sala já está em uso.');
+        return;
+      }
+    }
 
     // Rejoin idempotente: mesmo socket já nesta sala → só reenvia joined.
     // Sem isso, join de novo (ex.: cor diferente) criava um 2º player no mesmo

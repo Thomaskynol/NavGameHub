@@ -68,6 +68,15 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
   const requests = [];
   // Injeção de falha para R8: responde 500 nas próximas N consultas de state.
   let failStateCount = 0;
+  // Conflito de dono (Hub × jogo): a próxima consulta de state de um código
+  // ainda desconhecido cria a sala com este dono antes de responder — simula
+  // outra partida ocupando o código entre o check e o create do Hub.
+  // Valor null = sala explícita sem dono; undefined = desligado.
+  let conflictOnceOwner = undefined;
+  let hasConflictOnce = false;
+  // Sala fantasma: todo código desconhecido existe com este dono (sem criar).
+  let phantomOwner = null;
+  let hasPhantom = false;
 
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -91,7 +100,35 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
           writeJson(res, 500, { ok: false, error: 'BOOM' });
           return;
         }
-        const room = rooms.get(roomCode);
+        let room = rooms.get(roomCode);
+        if (!room && hasConflictOnce) {
+          const owner = conflictOnceOwner;
+          hasConflictOnce = false;
+          conflictOnceOwner = undefined;
+          room = {
+            code: roomCode,
+            phase: 'lobby',
+            players: 2,
+            capacity: 8,
+            joinable: true,
+          };
+          if (owner !== undefined) room.hubOwner = owner;
+          rooms.set(roomCode, room);
+        }
+        if (!room && hasPhantom) {
+          writeJson(res, 200, {
+            ok: true,
+            room: {
+              code: roomCode,
+              phase: 'lobby',
+              players: 2,
+              capacity: 8,
+              joinable: false,
+              hubOwner: phantomOwner,
+            },
+          });
+          return;
+        }
         if (!room) {
           writeJson(res, 404, { ok: false, error: 'NOT_FOUND' });
           return;
@@ -104,14 +141,22 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
             players: room.players,
             capacity: room.capacity,
             joinable: room.joinable,
+            ...(room.hubOwner !== undefined ? { hubOwner: room.hubOwner } : {}),
             ...(room.startedAt ? { startedAt: room.startedAt } : {}),
           },
         });
         return;
       }
       if (url.pathname === '/__hub/close') {
-        rooms.delete(roomCode);
-        writeJson(res, 200, { ok: true });
+        const target = rooms.get(roomCode);
+        const htok = url.searchParams.get('htok');
+        // Com dono: só fecha se o htok conferir (403 senão, sem destruir).
+        if (target && target.hubOwner !== undefined && target.hubOwner !== htok) {
+          writeJson(res, 403, { ok: false, error: 'FORBIDDEN' });
+          return;
+        }
+        const existed = rooms.delete(roomCode);
+        writeJson(res, 200, { ok: true, closed: existed });
         return;
       }
     }
@@ -140,6 +185,14 @@ export async function startFakeGame({ id, secret = SECRET } = {}) {
     requests,
     setFailState(n) {
       failStateCount = n;
+    },
+    conflictOnce(owner) {
+      hasConflictOnce = true;
+      conflictOnceOwner = owner;
+    },
+    setPhantomOwner(owner) {
+      hasPhantom = owner !== undefined && owner !== null;
+      phantomOwner = owner;
     },
     createRoom(code, options = {}) {
       rooms.set(code, {

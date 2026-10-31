@@ -65,7 +65,7 @@ describe('hub: estado e fechamento', () => {
     expect(status).toBe(200);
     expect(body).toEqual({
       ok: true,
-      room: { code: session.roomCode, phase: 'lobby', players: 1, capacity: 4, joinable: true },
+      room: { code: session.roomCode, phase: 'lobby', players: 1, capacity: 4, joinable: true, hubOwner: null },
     });
   });
 
@@ -89,7 +89,7 @@ describe('hub: estado e fechamento', () => {
     expect(status).toBe(200);
     expect(body).toEqual({
       ok: true,
-      room: { code: wanted, phase: 'lobby', players: 2, capacity: 4, joinable: true },
+      room: { code: wanted, phase: 'lobby', players: 2, capacity: 4, joinable: true, hubOwner: null },
     });
   });
 
@@ -106,7 +106,7 @@ describe('hub: estado e fechamento', () => {
     expect(status).toBe(200);
     expect(body).toEqual({
       ok: true,
-      room: { code, phase: 'playing', players: 3, capacity: 4, joinable: false },
+      room: { code, phase: 'playing', players: 3, capacity: 4, joinable: false, hubOwner: null },
     });
   });
 

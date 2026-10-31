@@ -150,7 +150,12 @@ function RealApp() {
             return;
           }
         }
-        const joined = await emitLobbyCommand(socket, { type: 'join_room', code: params.room, nickname: params.name });
+        const joined = await emitLobbyCommand(socket, {
+          type: 'join_room',
+          code: params.room,
+          nickname: params.name,
+          ...(params.htok ? { hubToken: params.htok } : {}),
+        });
         if (joined.ok && joined.session) {
           adoptSession(joined.session);
           setHubState('done');

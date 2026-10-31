@@ -37,8 +37,14 @@ Banco: SQLite via `node:sqlite` (módulo nativo do Node ≥ 22.13), caminho em `
 - Sala encerrada (`POST /__hub/close` autorizado ou último `leave_room`) é
   **removida por completo** (sala + membros + chat + `processed_commands`) e o
   código fica livre para reutilização segura (com identidade `hub_token`).
-- Migração v1 → v2: adiciona `rooms.hub_token` e apaga salas com `closed = 1`
-  (códigos históricos que bloqueavam reutilização para sempre) com seus dados.
+- Migração v1 → v2: **só-aditiva e atômica** — adiciona `rooms.hub_token`
+  (`''` = sem dono/legado) e avança `user_version`/`meta.format` na mesma
+  transação; **nada é apagado**. Salas `closed = 1` herdadas de v1 permanecem
+  no arquivo mas nunca bloqueiam código novo (`roomCodeExists` considera só
+  `closed = 0`; `insertRoom` descarta o resíduo `closed = 1` na transação do
+  create). Falha no meio desfaz tudo (DDL transacional) e a reabertura é limpa;
+  resíduo de ALTER sem versionar (migração antiga) é absorvido pela guarda de
+  coluna. Detalhes e alternativas em `src/server/db.ts`.
 - Sala fechada nunca bloqueia código novo: `roomCodeExists` considera só
   `closed = 0`, e `insertRoom` descarta resíduo `closed = 1` na mesma transação.
 - Nunca apagar sala por erro de leitura.

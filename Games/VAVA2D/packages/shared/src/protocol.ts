@@ -9,7 +9,7 @@ export interface JoinedMessage {
 
 export type ClientMessage =
   | { t: 'create'; name: string; code?: string; room?: string; htok?: string | null }
-  | { t: 'join'; code: string; name: string }
+  | { t: 'join'; code: string; name: string; htok?: string | null }
   | { t: 'input'; input: PlayerInput }
   | { t: 'ping'; id: number }
   | { t: 'chooseCard'; card: string };

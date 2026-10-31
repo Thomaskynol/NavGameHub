@@ -74,6 +74,7 @@ const ERROR_MESSAGES = {
   NOT_IN_ROOM: 'Você não está em uma sala.',
   NOT_READY: 'A partida ainda não pode começar.',
   LAUNCHING: 'A sala está iniciando uma partida. Tente novamente em instantes.',
+  LAUNCH_CONFLICT: 'O código da partida conflitou com outra sala do jogo. Gerando um novo código — tente novamente.',
   BAD_PHASE: 'Esta ação não é permitida na fase atual da sala.',
   LAUNCH_FAILED: 'Não foi possível iniciar a partida. Tente novamente.',
   GAME_FAILED: 'A partida foi interrompida: o servidor do jogo parou de responder. A sala voltou ao lobby.',
@@ -139,6 +140,13 @@ export function createHub(options = {}) {
   // gameId+gameCode+htok e a entrada vive aqui (fora da sala), executada no
   // prazo ou imediatamente se a sala for destruída antes.
   const pendingCloses = new Map();
+  // Resultado dos últimos fechamentos (best-effort): exposto no snapshot para
+  // diagnóstico — 403/409 (dono divergente) nunca é "fechado".
+  const closeLog = [];
+  const MAX_CLOSE_LOG = 20;
+  // Conflitos de código (outro dono) por launch: até N novos códigos antes de
+  // devolver a sala ao lobby com LAUNCH_CONFLICT.
+  const MAX_CONFLICT_RETRIES = 3;
   // Lançamentos do mesmo jogo passam por um mutex (R2): a reserva do código
   // é síncrona, e a verificação é serializada por gameId.
   const launchLocks = new Map();
@@ -749,6 +757,8 @@ export function createHub(options = {}) {
     if (!memberOf(room, member.identity)) return;
     if (member.role !== 'waiting') return;
     if (!state || state.kind !== 'exists' || !state.room) return;
+    // Sala alheia (outro dono): nunca promove nem envia play para lá.
+    if (!ownsRoomState(state, match.htok)) return;
     if (state.room.phase !== 'lobby' || state.room.joinable !== true) return;
     if (
       Number.isFinite(state.room.players)
@@ -908,10 +918,12 @@ export function createHub(options = {}) {
       const candidate = generateGameCode(game);
       if (gameCodeInUse(candidate, game.id, room.code)) continue;
       const htok = (room.match && room.match.htok) || randomBytes(16).toString('hex');
+      const conflicts = (room.match && room.match.conflicts) || 0;
       const connectedPlayers = room.members.filter((m) => m.role === 'player' && m.connected);
       room.match = {
         gameCode: candidate,
         htok,
+        conflicts,
         startedAt: now(),
         joinable: !!game.midMatchJoin,
         expect: Math.max(1, connectedPlayers.length),
@@ -961,7 +973,7 @@ export function createHub(options = {}) {
     }
     if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
     if (room.match.failed) {
-      failLaunch(room);
+      failLaunch(room, room.match.failed === 'conflict' ? 'LAUNCH_CONFLICT' : 'LAUNCH_FAILED');
       return;
     }
     room.match.reserved = false;
@@ -991,6 +1003,8 @@ export function createHub(options = {}) {
 
   // Confirma que o código reservado está livre no servidor do jogo. Em
   // colisão (sala existe), reserva outro candidato — ainda sob o mutex.
+  // Com dono divergente (outro htok ou null) é CONFLITO: nunca adota a sala
+  // alheia — gera novo código (até o limite) em vez de mandar o grupo para lá.
   // Erro de rede/timeout é tolerado aqui (tenta de novo até o prazo); se
   // esgotar as tentativas, marca falha para failLaunch fora do mutex.
   async function verifyLaunchCode(room, game) {
@@ -1004,15 +1018,32 @@ export function createHub(options = {}) {
       if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
       if (state.kind === 'free') return;
       if (state.kind === 'exists') {
+        if (!ownsRoomState(state, room.match.htok)) {
+          room.match.conflicts = (room.match.conflicts || 0) + 1;
+          logAt('warn', `[hub] código ${room.match.gameCode} (${game.id}) com outro dono: conflito ${room.match.conflicts}, tentando novo código.`);
+          if (room.match.conflicts > MAX_CONFLICT_RETRIES) {
+            room.match.failed = 'conflict';
+            return;
+          }
+        }
         if (!reserveLaunchCode(room, game)) {
-          room.match.failed = true;
+          room.match.failed = (room.match.conflicts || 0) > 0 ? 'conflict' : true;
           return;
         }
         continue;
       }
       await sleep(timings.launchPollInterval);
     }
-    if (room.match) room.match.failed = true;
+    if (room.match) room.match.failed = (room.match.conflicts || 0) > 0 ? 'conflict' : true;
+  }
+
+  // Dono da partida (contrato htok): o jogo informa `hubOwner` no state.
+  // Chave ausente = jogo legado (aceita provisoriamente); chave presente
+  // (mesmo null) precisa ser igual ao htok do launch, senão é CONFLITO.
+  function ownsRoomState(state, htok) {
+    if (!state || state.kind !== 'exists' || !state.room) return false;
+    if (state.room.hubOwner === undefined) return true;
+    return state.room.hubOwner === htok;
   }
 
   function pickLaunchCreator(room) {
@@ -1030,7 +1061,9 @@ export function createHub(options = {}) {
         failLaunch(room);
         return;
       }
-      const state = await fetchGameState(game, code);
+      // Lê o código atual do match (conflitos reservam um novo no meio do poll).
+      const current = room.match ? room.match.gameCode : code;
+      const state = await fetchGameState(game, current);
       if (!rooms.has(room.code) || room.phase !== 'launching') return;
       // Erro transitório não encerra o lançamento: continua até o prazo (R8).
       if (state.kind === 'error') {
@@ -1042,6 +1075,36 @@ export function createHub(options = {}) {
         return;
       }
       if (state.kind === 'exists') {
+        if (!ownsRoomState(state, room.match.htok)) {
+          // CONFLITO pós-create: outro dono ocupou o código (o create do
+          // criador recebeu CODE_TAKEN no jogo). Nunca envia play para a sala
+          // alheia: reserva novo código e reemite play create=1 ao criador.
+          room.match.conflicts = (room.match.conflicts || 0) + 1;
+          logAt('warn', `[hub] código ${code} (${game.id}) com outro dono após create: conflito ${room.match.conflicts}, tentando novo código.`);
+          if (room.match.conflicts > MAX_CONFLICT_RETRIES || now() >= room.launch.deadline) {
+            failLaunch(room, 'LAUNCH_CONFLICT');
+            return;
+          }
+          if (!reserveLaunchCode(room, game)) {
+            failLaunch(room, 'LAUNCH_CONFLICT');
+            return;
+          }
+          const nextCode = room.match.gameCode;
+          room.launch.code = nextCode;
+          let creatorMember = room.members.find((m) => m.id === room.launch.creatorId);
+          if (!creatorMember || !creatorMember.connected) {
+            creatorMember = oldestConnectedPlayer(room);
+            if (!creatorMember) {
+              failLaunch(room, 'LAUNCH_CONFLICT');
+              return;
+            }
+            room.launch.creatorId = creatorMember.id;
+          }
+          sendPlay(creatorMember, room, true);
+          roomChanged(room);
+          room.launchTimer = setTimeout(tick, timings.launchPollInterval);
+          return;
+        }
         const creatorId = room.launch.creatorId;
         room.phase = 'playing';
         if (room.match && state.room && typeof state.room.joinable === 'boolean') {
@@ -1066,7 +1129,7 @@ export function createHub(options = {}) {
     room.launchTimer = setTimeout(tick, timings.launchPollInterval);
   }
 
-  function failLaunch(room) {
+  function failLaunch(room, code = 'LAUNCH_FAILED') {
     if (!rooms.has(room.code) || room.phase !== 'launching') return;
     if (room.launch && room.launch.timer) clearTimeout(room.launch.timer);
     if (room.launchTimer) {
@@ -1079,11 +1142,11 @@ export function createHub(options = {}) {
     resetReadiness(room);
     for (const member of room.members) {
       if (member.connected && member.identity.conn) {
-        sendError(member.identity.conn, 'LAUNCH_FAILED');
+        sendError(member.identity.conn, code);
       }
     }
     roomChanged(room);
-    logAt('warn', `[hub] lançamento da sala ${room.code} falhou.`);
+    logAt('warn', `[hub] lançamento da sala ${room.code} falhou (${code}).`);
   }
 
   // Falha persistente do servidor do jogo (R8): marca a sala como FALHA com
@@ -1124,6 +1187,16 @@ export function createHub(options = {}) {
       const state = await fetchGameState(game, room.match.gameCode);
       if (!rooms.has(room.code) || room.phase !== 'playing' || !room.match) return;
       if (state.kind === 'free') {
+        room.match.errors = 0;
+        room.match.notFound += 1;
+        if (room.match.notFound >= timings.playNotFoundLimit) {
+          finishRoom(room, game);
+          return;
+        }
+      } else if (state.kind === 'exists' && !ownsRoomState(state, room.match.htok)) {
+        // Código reutilizado por outra partida: a nossa sumiu. Conta como
+        // ausência (nunca adota a sala alheia) até encerrar pelo fluxo normal;
+        // o close com nosso htok será recusado (403) sem destruir nada.
         room.match.errors = 0;
         room.match.notFound += 1;
         if (room.match.notFound >= timings.playNotFoundLimit) {
@@ -1267,8 +1340,9 @@ export function createHub(options = {}) {
     }
   }
 
-  async function closeGameRoom(game, code, htok) {
-    if (!game || !code) return;
+  async function closeGameRoom(gameOrId, code, htok) {
+    const game = typeof gameOrId === 'string' ? games.get(gameOrId) : gameOrId;
+    if (!game || !code) return null;
     const sendOnce = async () => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timings.stateTimeout);
@@ -1277,7 +1351,7 @@ export function createHub(options = {}) {
         // Identidade do launch (R2): o jogo só fecha se o dono conferir —
         // protege reutilização do código por outra partida.
         if (htok) params.set('htok', htok);
-        await fetch(
+        const response = await fetch(
           `${gameBaseUrl(game)}/__hub/close?${params.toString()}`,
           {
             method: 'POST',
@@ -1285,21 +1359,55 @@ export function createHub(options = {}) {
             signal: controller.signal,
           },
         );
+        // Dono divergente: não é minha — registra e NÃO insiste (sem retry).
+        if (response.status === 403 || response.status === 409) {
+          return { status: response.status, closed: false, notMine: true };
+        }
+        if (response.ok) {
+          const body = await response.json().catch(() => null);
+          // Só conta como fechado com 200 {closed:true}.
+          return { status: response.status, closed: !!(body && body.closed === true), notMine: false };
+        }
+        return { status: response.status, closed: false, notMine: false };
       } finally {
         clearTimeout(timer);
       }
     };
+    const finish = (result) => {
+      const entry = {
+        gameId: game.id,
+        gameCode: code,
+        status: result.status,
+        closed: !!result.closed,
+        notMine: !!result.notMine,
+        at: now(),
+      };
+      closeLog.push(entry);
+      if (closeLog.length > MAX_CLOSE_LOG) closeLog.splice(0, closeLog.length - MAX_CLOSE_LOG);
+      if (entry.notMine) {
+        logAt('warn', `[hub] close de ${code} (${game.id}) recusado (dono divergente): não é minha, sem insistir.`);
+      }
+      return { status: entry.status, closed: entry.closed, notMine: entry.notMine };
+    };
+    let result = null;
     try {
-      await sendOnce();
+      result = await sendOnce();
     } catch {
+      result = null;
+    }
+    if (result && result.notMine) return finish(result);
+    if (!result || (!result.closed && result.status !== 404)) {
       // Uma falha isolada não derruba a limpeza: tenta de novo uma vez.
       await sleep(200);
       try {
-        await sendOnce();
+        const second = await sendOnce();
+        if (second.notMine) return finish(second);
+        result = second;
       } catch {
-        // O jogo pode já ter encerrado a partida; a limpeza é best-effort.
+        if (!result) result = { status: 0, closed: false, notMine: false };
       }
     }
+    return finish(result);
   }
 
   // ---------- saúde / catálogo ----------
@@ -1653,10 +1761,11 @@ export function createHub(options = {}) {
           expect: room.match.expect,
         } : null,
       })),
+      closeLog: closeLog.map((entry) => ({ ...entry })),
     };
   }
 
-  return { server, wss, listen, close, snapshot };
+  return { server, wss, listen, close, snapshot, closeGameRoom };
 }
 
 // ---------- helpers fora do hub ----------

@@ -342,6 +342,16 @@ async function handleLobby(ctx: AppContext, socket: AppSocket, raw: unknown, ack
         ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.ROOM_NOT_FOUND, 'Sala não encontrada.') });
         return;
       }
+      // Identidade (htok) no join: join com htok explícito só entra se conferir
+      // com o dono da sala. Divergente — ou htok em sala sem dono (legada) —
+      // recusa com CODE_TAKEN sem criar entrada. Sem htok: legado preservado
+      // (entra como antes); o guardião contra mistura de grupos no fluxo do Hub
+      // é o create_room (create=1), que nunca faz join cego após CODE_TAKEN.
+      const joinHtok = (payload.hubToken ?? '').trim();
+      if (joinHtok !== '' && room.hubToken !== joinHtok) {
+        ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.CODE_TAKEN, 'Código de sala já está em uso.') });
+        return;
+      }
       if (room.state !== null || room.phase !== 'lobby') {
         ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.ALREADY_STARTED, 'A partida já começou.') });
         return;
@@ -742,17 +752,19 @@ function runHook(ctx: AppContext, room: Room, hook: HookCommand): CommandRespons
 // ---------- Hub (hub/PROTOCOLO.md) ----------
 
 /** Fecha a sala a pedido do Hub (POST /__hub/close). Idempotente.
- * Com htok (dono da instância): só fecha se o token conferir; fechamento
+ * Com dono (hubToken não vazio): só fecha se o htok conferir; divergente ou
+ * ausente => { forbidden: true } (HTTP 403 FORBIDDEN, sala intacta). Fechamento
  * tardio de uma partida antiga nunca atinge a partida nova que reutilizou o
- * código. Sem dono (legado, hubToken ''): fecha como antes. */
-export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknown): void {
+ * código. Sem dono (legado, hubToken ''): fecha livremente. Sala inexistente
+ * => ok (nada a fazer). */
+export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknown): { ok: true } | { ok: false; error: 'FORBIDDEN' } {
   const code = String(rawCode ?? '').toUpperCase().trim();
   const room = ctx.store.rooms.get(code);
-  if (!room) return;
-  // shortcut: sala sem dono fecha direto; com dono exige o token da instância.
+  if (!room) return { ok: true };
+  // shortcut: sala com dono exige o token da instância; sem ele/diferente não fecha.
   if (room.hubToken !== '') {
     const provided = typeof rawToken === 'string' ? rawToken.trim() : '';
-    if (provided !== room.hubToken) return;
+    if (provided !== room.hubToken) return { ok: false, error: 'FORBIDDEN' };
   }
   tx(ctx.db, () => {
     for (const member of room.members.values()) {
@@ -769,6 +781,7 @@ export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknow
   });
   ctx.store.rooms.delete(room.code);
   logInfo('hub_room_closed', { roomCode: room.code });
+  return { ok: true };
 }
 
 /** Hook de teste do Hub (HUB_TEST_HOOKS=1): declara vitória e vai para game_over. */

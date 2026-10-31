@@ -175,6 +175,12 @@ export function gameCodeOf(playMsg) {
   return new URL(playMsg.url).searchParams.get('room');
 }
 
+// Dono da partida (htok) que o Hub gera por launch: o lado do jogo precisa
+// recebê-lo no create/join, como o cliente real faz (?hub=1&htok=...).
+export function htokOf(playMsg) {
+  return new URL(playMsg.url).searchParams.get('htok');
+}
+
 // Conecta no WS de um jogo (arcade/vava) e cria/entrar com código do Hub.
 export function gameWs(port, path = '/ws') {
   return new Promise((resolve, reject) => {

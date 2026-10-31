@@ -21,6 +21,15 @@
 //   flow7-play-real            play-real  inputs reais (Arcade largada +
 //                                         snapshots; VAVA movimento) sem hook
 //                                         e sem fim natural (ver README)
+//   flow8-arcade-natural       play-real  Arcade NATURAL via Hub (navegador):
+//                                         sala→ready→iframe→1 volta pilotada
+//                                         até o pódio SEM hook→retorno
+//   flow9-catan-vava-natural     play-real  Catan setup+turnos e VAVA 70s+carta,
+//                                         tudo real sem hook; fins naturais
+//                                         declarados como NÃO cobertos
+//   flow10-offline               offline    Hub+Arcade completos no navegador
+//                                         com hosts externos ABORTADOS (0
+//                                         tolerados); fim por hook
 //   ui-smoke                   hooks      Hub no navegador (VAVA); fim por hook
 //   verify-arcade-browser      hooks      iframes entram sozinhos; fim por hook
 //   verify-catan-browser       hooks      UI real até o start; win por hook
@@ -47,6 +56,9 @@ const SUITE = [
   { script: 'flow5-nicknames.mjs', proof: 'regras' },
   { script: 'flow6-catan.mjs', proof: 'hooks' },
   { script: 'flow7-play-real.mjs', proof: 'play-real' },
+  { script: 'flow8-arcade-natural.mjs', proof: 'play-real' },
+  { script: 'flow9-catan-vava-natural.mjs', proof: 'play-real' },
+  { script: 'flow10-offline.mjs', proof: 'offline' },
   { script: 'ui-smoke.mjs', proof: 'hooks' },
   { script: 'verify-arcade-browser.mjs', proof: 'hooks' },
   { script: 'verify-catan-browser.mjs', proof: 'hooks' },

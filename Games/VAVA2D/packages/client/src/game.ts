@@ -23,7 +23,7 @@ import type { RenderBullet, RenderDrop, RenderGrenade, RenderPlayer, RenderPower
 
 type JoinRequest =
   | { t: 'create'; name: string; code?: string; htok?: string | null }
-  | { t: 'join'; code: string; name: string };
+  | { t: 'join'; code: string; name: string; htok?: string | null };
 
 export interface HubParams {
   room: string;
@@ -88,7 +88,9 @@ export class Game {
     if (hub.create) {
       void this.connect({ t: 'create', name: hub.name, code: hub.room, htok: hub.htok });
     } else {
-      void this.connect({ t: 'join', code: hub.room, name: hub.name });
+      // create=0 (demais membros): leva o htok do launch para o servidor
+      // validar a identidade da partida (mesmo dono entra; outro é recusado).
+      void this.connect({ t: 'join', code: hub.room, name: hub.name, htok: hub.htok });
     }
   }
 

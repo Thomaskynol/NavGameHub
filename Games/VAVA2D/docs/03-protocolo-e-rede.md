@@ -223,6 +223,30 @@ inteiro percorrido no tick, então mesmo 12 px por tick são cobertos.
 - Sala cheia (>8) ou inexistente retorna erro.
 - Nenhuma posição, vida ou dano enviado pelo cliente é aceito.
 
+## Integração com o Hub (`/__hub/*`, htok)
+
+Modo Hub: `?hub=1&room=&name=&create=1|0&expect=&slot=&hubUrl=&htok=`. O `htok`
+é o dono da partida (opaco, `1..64` chars `[A-Za-z0-9_-]`; outro formato vira
+sem dono). O jogo só guarda e compara por igualdade exata.
+
+- `create` aceita `code` opcional (4 caracteres) e `htok` opcional. Código
+  ocupado + mesmo `htok` → entra/resume (retentativa legítima do mesmo launch,
+  sem `CODE_TAKEN`); ocupado + `htok` diferente/ausente → `CODE_TAKEN` honesto,
+  e o cliente do Hub NÃO faz join cego após colisão (erro honesto).
+- `join` aceita `htok` opcional. Com `htok` de outro launch, ou com `htok` em
+  sala sem dono → recusado com `(OWNER_MISMATCH)`, SEM entrar. Mesmo `htok`
+  entra (resume/startHub legítimo do mesmo launch, `create=0`). **Sem `htok`
+  vale o legado: entra como antes**, inclusive em sala com dono.
+- `GET /__hub/state?room=CODE` (com `x-hub-secret`) responde `phase`
+  (`waiting→lobby`, `playing|cardSelection→playing`, `ended→results`),
+  `players`, `capacity`, `joinable` e `hubOwner` (token ou `null` na legada).
+  Sala inexistente → `404 { ok:false, error:'NOT_FOUND' }`.
+- `POST /__hub/close?room=CODE&htok=TOKEN` (com `x-hub-secret`): idempotente.
+  Sala com dono só fecha com o mesmo `htok`; divergente/ausente → `403`
+  e a sala segue intacta. Sala sem dono (manual/legada) fecha como antes.
+- Hook de teste (só com `HUB_TEST_HOOKS=1`): `POST /__hub/test/end?room=CODE`
+  força o fim da partida.
+
 ## Formato futuro
 
 Para reduzir banda, a evolução natural é um protocolo binário com `DataView`/structs,

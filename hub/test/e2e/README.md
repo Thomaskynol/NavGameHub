@@ -1,6 +1,6 @@
 # Suíte E2E do Game Hub
 
-`npm run e2e` (na raiz) sobe Hub + 3 jogos efêmeros e roda os 10 fluxos.
+`npm run e2e` (na raiz) sobe Hub + 3 jogos efêmeros e roda os 13 fluxos.
 Nada aqui toca em `hub/server.js`, jogos ou `start.sh`/`stop.sh`.
 
 ## Como rodar
@@ -10,6 +10,12 @@ npm run e2e                        # suíte completa (Hub + 3 jogos efêmeros)
 node hub/test/e2e/run-all.mjs flow6-catan.mjs   # um fluxo só (sobe o stack mesmo assim)
 E2E_KEEP_TMP=1 npm run e2e          # preserva tmp (logs, shots, manifest) p/ debug
 ```
+
+São 13 fluxos: `flow1–flow6` (Hub/jogos via protocolo e regras), `flow7`
+(play-real parcial), `flow8` (Arcade natural completo via Hub), `flow9`
+(Catan/VAVA naturais parciais + não-cobertura declarada), `flow10` (offline
+com bloqueio de externos), `ui-smoke`, `verify-arcade-browser`,
+`verify-catan-browser`.
 
 Rodar um fluxo avulso contra uma instância já no ar (ex.: `start.sh`):
 
@@ -31,7 +37,9 @@ no relatório. Não apresente `hooks` como partida completa:
 |---|---|
 | `hooks` | final forçado por hook de teste (`/__hub/test/...`). Cobre transições Hub↔jogo, não jogabilidade. |
 | `regras` | efeito/término pelas regras normais do servidor, sem jogar tudo (ex.: capacidade, nick, host-transfer). |
-| `play-real` | ações reais de jogo (inputs + progresso pela simulação normal), sem hook — mas sem fim natural: uma corrida inteira, uma arena de 5 min ou um Catan completo são longos demais p/ a suíte. |
+| `play-real` | ações reais de jogo (inputs + progresso pela simulação normal), sem hook — mas sem fim natural: uma corrida inteira, uma arena de 5 min ou um Catan completo são longos demais p/ a suíte. **Exceção: `flow8` é natural completo (1 volta pilotada até o pódio, sem hook) e `flow9` é progressão natural parcial máxima viável (Catan setup+turnos, VAVA 70s+carta) com o não-coberto declarado no log.** |
+| `offline` | fluxo completo no navegador com **qualquer request para host externo abortado** (0 tolerados) e falha se asset necessário falhar. Não altera rede/firewall da máquina; não equivale a cabo desplugado/rede cortada no SO. |
+| `natural` | (qualificador, não coluna) fim atingido pelas regras normais do jogo, sem hook — usado em `flow8` (corrida) e nas declarações de não-cobertura de `flow9`. |
 
 ## Falhas estritas de navegador
 

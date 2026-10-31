@@ -77,7 +77,7 @@ export interface CommandEnvelope {
 
 export type LobbyCommand =
   | { type: 'create_room'; nickname: string; roomName?: string; roomCode?: string; hubToken?: string }
-  | { type: 'join_room'; code: string; nickname: string }
+  | { type: 'join_room'; code: string; nickname: string; hubToken?: string }
   /** Vincula o socket a uma sala+jogador usando o código de recuperação.
    * mode 'resume' = retomar (ex.: atualizar aba); 'takeover' = assumir controle
    * explicitamente quando outro socket ainda detém o jogador (avisa o anterior). */

@@ -67,19 +67,43 @@ function migrate(db: DatabaseSync): void {
     return;
   }
   if (current === 1) {
-    // v1 -> v2: identidade do dono (htok) + libera códigos históricos fechados.
-    // Salas fechadas bloqueavam o código para sempre (404 no state + CODE_TAKEN
-    // no create); a partir da v2 sala fechada é removida e o código é reutilizável
-    // com segurança via hub_token (fechamento tardio confere o dono).
-    db.exec('ALTER TABLE rooms ADD COLUMN hub_token TEXT NOT NULL DEFAULT \'\'');
-    db.exec(`
-      DELETE FROM members WHERE room_code IN (SELECT code FROM rooms WHERE closed = 1);
-      DELETE FROM chat WHERE room_code IN (SELECT code FROM rooms WHERE closed = 1);
-      DELETE FROM processed_commands WHERE room_code IN (SELECT code FROM rooms WHERE closed = 1);
-      DELETE FROM rooms WHERE closed = 1;
-    `);
-    db.prepare('PRAGMA user_version = 2').run();
-    db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('format', String(SCHEMA_VERSION));
+    // v1 -> v2: migração SÓ-ADITIVA (atômica): adiciona rooms.hub_token e
+    // avança user_version/meta na mesma transação. Nada é apagado.
+    //
+    // O que a migração antiga apagava (e por que não apagamos mais):
+    // - rooms com closed=1 + seus members/chat/processed_commands. Eram códigos
+    //   históricos fechados que bloqueavam reutilização para sempre (404 no
+    //   state + CODE_TAKEN no create). Mas a remoção NÃO é necessária para o
+    //   funcionamento: roomCodeExists filtra closed=0 e insertRoom descarta o
+    //   resíduo closed=1 na mesma transação do create (reutilização segura com
+    //   identidade hub_token). Apagar dados do usuário na migração é
+    //   irreversível; o padrão é não apagar nada. Alternativa se o banco
+    //   crescer: limpeza explícita via POST /__hub/close ou leave_room do
+    //   último membro (remove por completo), com backup prévio do arquivo
+    //   (docs/persistence.md) — nunca DELETE implícito no boot.
+    //
+    // Atomicidade: SQLite DDL é transacional; ALTER + versão no mesmo
+    // BEGIN/COMMIT => falha no meio desfaz tudo e a reabertura encontra v1
+    // limpo (ou, em DBs tocados pela migração antiga que fez ALTER sem
+    // versionar, a guarda de coluna abaixo absorve o resíduo sem
+    // "duplicate column").
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const cols = db.prepare('PRAGMA table_info(rooms)').all() as { name: string }[];
+      if (!cols.some((c) => c.name === 'hub_token')) {
+        db.exec('ALTER TABLE rooms ADD COLUMN hub_token TEXT NOT NULL DEFAULT \'\'');
+      }
+      db.prepare('PRAGMA user_version = 2').run();
+      db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('format', String(SCHEMA_VERSION));
+      db.exec('COMMIT');
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        /* rollback falhou; erro original prevalece */
+      }
+      throw err;
+    }
     pruneProcessed(db);
     return;
   }

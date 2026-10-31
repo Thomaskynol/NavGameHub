@@ -70,6 +70,8 @@ export function createRequestHandler(
           players: room.playerCount,
           capacity: MATCH.maxPlayers,
           joinable: !room.isFull,
+          // Dono da partida (htok do launch); null = sala manual/legada.
+          hubOwner: room.hubOwner,
         },
       });
       return;

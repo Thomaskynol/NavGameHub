@@ -1,7 +1,7 @@
 // F1: Arcade 2 clientes — criar, entrar (código), prontos, mesmo game code, finish, retorno.
 // PROOF: hooks — o fim da corrida é forçado via hook (não é partida jogada).
 import {
-  HubClient, gameWs, wsNext, hubPost, gameCodeOf, uniqNick, delay, waitOnline,
+  HubClient, gameWs, wsNext, hubPost, gameCodeOf, htokOf, uniqNick, delay, waitOnline,
   E2E, proofLine,
 } from './e2e-helpers.mjs';
 
@@ -43,12 +43,15 @@ await waitOnline(A, 'arcade');
   await B.setReady(true);
   const playA = await playAPromise;
   const gameCode = gameCodeOf(playA);
+  const htok = htokOf(playA);
   console.log(`[f1] launching: gameCode=${gameCode} (A create=1)`);
   if (!gameCode || gameCode.length !== 6) throw new Error('game code inválido');
 
   // Lado do jogo: A cria a sala no Arcade com o código do Hub; B entra.
+  // O htok do launch vai junto (como o cliente real ?hub=1&htok=): sem ele
+  // a sala nasce sem dono e o Hub a trata como CONFLITO.
   arcadeA = await gameWs(E2E.arcadePort);
-  arcadeA.send(JSON.stringify({ t: 'create', name: nickA, room: gameCode }));
+  arcadeA.send(JSON.stringify({ t: 'create', name: nickA, room: gameCode, htok }));
   await wsNext(arcadeA, (m) => m.t === 'joined');
   console.log('[f1] sala criada no Arcade (lado jogo)');
 
@@ -61,7 +64,7 @@ await waitOnline(A, 'arcade');
   if (gameCodeB !== gameCode) throw new Error('game codes divergentes entre A e B');
 
   arcadeB = await gameWs(E2E.arcadePort);
-  arcadeB.send(JSON.stringify({ t: 'join', name: nickB, room: gameCode }));
+  arcadeB.send(JSON.stringify({ t: 'join', name: nickB, room: gameCode, htok }));
   await wsNext(arcadeB, (m) => m.t === 'joined');
   console.log('[f1] B entrou na sala do Arcade (lado jogo)');
 

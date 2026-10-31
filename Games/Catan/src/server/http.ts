@@ -100,16 +100,23 @@ function attachHubRoutes(app: Express, ctx: AppContext): void {
         players: room.members.size,
         capacity: MAX_PLAYERS,
         joinable: room.state === null && room.phase === 'lobby',
+        // Dono da instância (htok do launch); null = sem dono/legado.
+        hubOwner: room.hubToken === '' ? null : room.hubToken,
       },
     });
   });
 
   app.post('/__hub/close', (req, res) => {
     if (!guard(req, res)) return;
-    // htok: dono da instância (query ?htok=). Só fecha se conferir; fechamento
-    // tardio de partida antiga nunca atinge partida nova que reutilizou o código.
+    // htok: dono da instância (query ?htok=). Com dono, só fecha se conferir;
+    // divergente/ausente => 403 FORBIDDEN e a sala segue intacta. Sem dono
+    // (legado), fecha livremente. Inexistente => 200 idempotente.
     const htok = typeof req.query.htok === 'string' ? req.query.htok : undefined;
-    closeHubRoom(ctx, roomParam(req), htok);
+    const result = closeHubRoom(ctx, roomParam(req), htok);
+    if (!result.ok) {
+      res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+      return;
+    }
     res.json({ ok: true });
   });
 

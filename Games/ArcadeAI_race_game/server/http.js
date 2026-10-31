@@ -104,6 +104,7 @@ export function createHttpHandler({
           players: room.players.length,
           capacity: MAX_PLAYERS,
           joinable: room.status === 'lobby',
+          hubOwner: room.htok ?? null,
         },
       });
       return;
@@ -111,13 +112,22 @@ export function createHttpHandler({
 
     if (pathname === '/__hub/close') {
       if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }); res.end(); return; }
-      // Fecha com identidade (R2): sala com dono (htok) só fecha com o mesmo
-      // htok do launch (`?htok=`); sem ele → 403 e a sala segue intacta.
-      // Sala sem dono (manual/legada) mantém o comportamento anterior.
+      // Fecha com identidade: sala com dono só fecha com o mesmo htok do
+      // launch; sem ele ou com outro → 403 e a sala segue intacta (impede
+      // close atrasado de partida antiga derrubar sala alheia/reusada).
+      // Sala sem dono (manual/legada): sem htok mantém o comportamento
+      // anterior (só segredo do Hub); COM htok → 403 (não misturar close
+      // afiliado com sala independente).
       const room = rooms ? rooms.getRoom(code) : null;
+      const qHtok = url.searchParams.get('htok');
       if (room && room.htok) {
-        const htok = String(url.searchParams.get('htok') ?? '');
+        const htok = String(qHtok ?? '');
         if (htok !== room.htok) {
+          sendJson(res, 403, { ok: false, error: 'FORBIDDEN' });
+          return;
+        }
+      } else if (room && !room.htok) {
+        if (qHtok != null && qHtok !== '') {
           sendJson(res, 403, { ok: false, error: 'FORBIDDEN' });
           return;
         }

@@ -1,6 +1,9 @@
 // Asfalto Vivo — tipos de mensagem do protocolo WebSocket.
 // Fonte canônica de nomes de tipo; formatos descritos em ARCHITECTURE.md §3.
 // Uso: import { C2S, S2C } e confira `msg.t`.
+// Guarda de dono (Hub): join COM htok só entra com dono igual (dono
+// diferente ou sala sem dono → CODE_TAKEN, sem entrada); sem htok → regras
+// legadas (modo independente preservado, inclusive entrar em sala com dono).
 
 export const C2S = {
   CREATE: 'create',        // {name, color?, room?, htok?}  (room = código pedido pelo Hub; htok = dono p/ retry/close)

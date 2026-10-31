@@ -3,7 +3,7 @@
 // PROOF: hooks — os fins de partida são forçados via hook (o isolamento entre
 // salas é verificado pelas regras normais do servidor, sem hook).
 import {
-  HubClient, gameWs, wsNext, hubPost, hubState, gameCodeOf, uniqNick, delay, waitOnline,
+  HubClient, gameWs, wsNext, hubPost, hubState, gameCodeOf, htokOf, uniqNick, delay, waitOnline,
   E2E, proofLine,
 } from './e2e-helpers.mjs';
 
@@ -28,15 +28,17 @@ await B.joinRoom(room.code);
 await A.setReady(true);
 const playAP = A.waitPlay(1);
 await B.setReady(true);
-const gameCode = gameCodeOf(await playAP);
+const playA = await playAP;
+const gameCode = gameCodeOf(playA);
+const htok = htokOf(playA);
 const gA = track(await gameWs(E2E.arcadePort));
-gA.send(JSON.stringify({ t: 'create', name: 'MidA', room: gameCode }));
+gA.send(JSON.stringify({ t: 'create', name: 'MidA', room: gameCode, htok }));
 await wsNext(gA, (m) => m.t === 'joined');
 const playBPromise = B.waitPlay(0);
 const roomPlaying = await A.waitRoom((r) => r.phase === 'playing', 15000);
 const playB = await playBPromise;
 const gB = track(await gameWs(E2E.arcadePort));
-gB.send(JSON.stringify({ t: 'join', name: 'MidB', room: gameCode }));
+gB.send(JSON.stringify({ t: 'join', name: 'MidB', room: gameCode, htok }));
 await wsNext(gB, (m) => m.t === 'joined');
 console.log(`[f3] arcade playing gameCode=${gameCode}`);
 
@@ -48,7 +50,7 @@ check('late joiner no pregame começa como waiting', roomL.members.find((m) => m
 const playL = await playLP;
 check('late joiner no pregame é promovido (recebe play)', gameCodeOf(playL) === gameCode, `gameCode=${gameCodeOf(playL)}`);
 const gL = track(await gameWs(E2E.arcadePort));
-gL.send(JSON.stringify({ t: 'join', name: 'MidL', room: gameCode }));
+gL.send(JSON.stringify({ t: 'join', name: 'MidL', room: gameCode, htok }));
 await wsNext(gL, (m) => m.t === 'joined');
 check('late joiner entra de verdade na sala do jogo', true);
 
@@ -113,13 +115,15 @@ async function vavaRoom(nickBase) {
   await h1.setReady(true);
   const pp = h1.waitPlay(1);
   await h2.setReady(true);
-  const gc = gameCodeOf(await pp);
+  const play = await pp;
+  const gc = gameCodeOf(play);
+  const ghtok = htokOf(play);
   const w1 = track(await gameWs(E2E.vavaPort));
-  w1.send(JSON.stringify({ t: 'create', name: nickBase + '1', code: gc }));
+  w1.send(JSON.stringify({ t: 'create', name: nickBase + '1', code: gc, htok: ghtok }));
   await wsNext(w1, (m) => m.t === 'snapshot' || m.t === 'joined' || m.t === 'state', 8000).catch(() => null);
   await h1.waitRoom((x) => x.phase === 'playing', 15000);
   const w2 = track(await gameWs(E2E.vavaPort));
-  w2.send(JSON.stringify({ t: 'join', name: nickBase + '2', code: gc }));
+  w2.send(JSON.stringify({ t: 'join', name: nickBase + '2', code: gc, htok: ghtok }));
   return { h1, h2, hubCode: r.code, gameCode: gc };
 }
 const V1 = await vavaRoom('VavA');

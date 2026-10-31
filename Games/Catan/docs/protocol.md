@@ -50,16 +50,22 @@ Contrato com a frente do Hub (launch passa `&htok=<token>` na URL):
     legítima: entra na sala existente como nova vaga (lobby, com vaga e cor livre),
     sem `CODE_TAKEN`; sala cheia/iniciada retorna `ROOM_FULL`/`ALREADY_STARTED`;
   - código ocupado + `hubToken` diferente/ausente → `CODE_TAKEN` honesto.
-- O cliente do Hub (`App.tsx`, modo `?hub=1`) envia `hubToken` no `create` e
-  **nunca faz join cego** após `CODE_TAKEN`: qualquer falha no `create` vira tela
+- `join_room` aceita `hubToken` opcional: com `hubToken` explícito, só entra se
+  conferir com o dono da sala; divergente (ou `hubToken` em sala sem dono)
+  → `CODE_TAKEN` sem criar entrada. Sem `hubToken`: legado preservado (entra
+  como antes). Resume legítimo via `bind_session` (recoveryCode) segue ok.
+- O cliente do Hub (`App.tsx`, modo `?hub=1`) envia `hubToken` no `create` e no
+  `join` e **nunca faz join cego** após `CODE_TAKEN`: qualquer falha no `create` vira tela
   de erro honesta ("código em uso"). Retentativa legítima já retorna `ok` no
   servidor, então `CODE_TAKEN` sempre indica colisão com outra partida.
-- `POST /__hub/close?room=CODE&htok=TOKEN` (com `x-hub-secret`): idempotente,
-  responde sempre `{ ok:true }`. Com dono (`hubToken` não vazio), só fecha se o
-  `htok` conferir; fechamento tardio de partida antiga nunca atinge a partida
-  nova que reutilizou o código. Sem dono (legado), fecha como antes.
-  Sala inexistente → `{ ok:true }` (nada a fazer).
-- `GET /__hub/state?room=CODE`: sala aberta → `200` com fase/jogadores;
+- `POST /__hub/close?room=CODE&htok=TOKEN` (com `x-hub-secret`): idempotente.
+  Com dono (`hubToken` não vazio), só fecha se o `htok` conferir;
+  divergente/ausente → `403 { ok:false, error:'FORBIDDEN' }` e a sala segue
+  intacta. Fechamento tardio de partida antiga nunca atinge a partida
+  nova que reutilizou o código. Sem dono (legado), fecha livremente
+  (com ou sem `htok`). Sala inexistente → `{ ok:true }` (nada a fazer).
+- `GET /__hub/state?room=CODE`: sala aberta → `200` com fase/jogadores **e
+  `hubOwner`** (dono opaco do launch; `null` = sem dono/legado);
   sala fechada/removida → `404 NOT_FOUND`. Como sala fechada é **removida**
   (código liberado), não há janela `404 → CODE_TAKEN` para o solicitante
   legítimo além do transitório de propagação (o `close` é síncrono: memória +

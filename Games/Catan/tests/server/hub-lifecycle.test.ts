@@ -113,17 +113,18 @@ describe('hub htok: ciclo de vida e identidade', () => {
     if (!noTok.ok) expect(noTok.error.code).toBe('CODE_TAKEN');
   });
 
-  it('close com htok: sem token/errado não fecha; certo fecha; tardio não atinge partida nova', async () => {
+  it('close com htok: sem token/errado => 403 e sala intacta; certo fecha; tardio não atinge partida nova', async () => {
     const code = 'HTKBB3';
     const oldTok = 'partida-antiga-1';
     const newTok = 'partida-nova-2';
     const s1 = await h.connect();
     const c1 = await lobby(s1, { type: 'create_room', nickname: 'Ana', roomCode: code, hubToken: oldTok });
     expect(c1.ok).toBe(true);
-    // Fechamento sem token ou com token errado: no-op, sala segue aberta.
-    expect((await postClose(h, code)).status).toBe(200);
+    // Fechamento sem token ou com token errado: 403 FORBIDDEN, sala segue aberta.
+    expect((await postClose(h, code)).status).toBe(403);
+    expect((await postClose(h, code)).body).toEqual({ ok: false, error: 'FORBIDDEN' });
     expect((await getState(h, code)).status).toBe(200);
-    expect((await postClose(h, code, 'token-errado')).status).toBe(200);
+    expect((await postClose(h, code, 'token-errado')).status).toBe(403);
     expect((await getState(h, code)).status).toBe(200);
     // Dono certo fecha.
     expect((await postClose(h, code, oldTok)).status).toBe(200);
@@ -133,8 +134,9 @@ describe('hub htok: ciclo de vida e identidade', () => {
     const c2 = await lobby(s2, { type: 'create_room', nickname: 'Bia', roomCode: code, hubToken: newTok });
     expect(c2.ok).toBe(true);
     expect((await getState(h, code)).status).toBe(200);
-    // Fechamento tardio da partida antiga (htok velho): não atinge a nova.
-    expect((await postClose(h, code, oldTok)).status).toBe(200);
+    // Fechamento tardio da partida antiga (htok velho): 403, não atinge a nova.
+    expect((await postClose(h, code, oldTok)).status).toBe(403);
+    expect((await postClose(h, code, oldTok)).body).toEqual({ ok: false, error: 'FORBIDDEN' });
     const still = await getState(h, code);
     expect(still.status).toBe(200);
     expect((still.body as { room: { players: number } }).room.players).toBe(1);

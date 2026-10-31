@@ -152,6 +152,15 @@ export class Session {
           this.fail('Sala não encontrada. Confira o código.');
           return;
         }
+        // Contrato htok (R2): join com htok de outro launch, ou com htok em
+        // sala sem dono, é recusado SEM entrar (sem join cego, sem misturar
+        // grupos). Sem htok vale o legado (entra como antes, documentado).
+        // Mesmo htok entra (resume/startHub legítimo do mesmo launch).
+        const htok = sanitizeHtok(parsed.htok);
+        if (htok && (!room.hubOwner || room.hubOwner !== htok)) {
+          this.fail('Sala reservada para outra partida do Hub. (OWNER_MISMATCH)');
+          return;
+        }
         if (room.isFull) {
           this.fail('Sala cheia (máximo de 8 jogadores).');
           return;
