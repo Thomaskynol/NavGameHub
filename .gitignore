@@ -1,0 +1,21 @@
+# Dependências e builds
+node_modules/
+dist/
+build/
+.run/
+
+# Planejamento e artefatos de teste
+.planning/
+test-results/
+playwright-report/
+blob-report/
+*.log
+*.pid
+.DS_Store
+
+# Bancos e segredos locais
+*.db
+*.db-journal
+*.db-wal
+.env
+.env.*

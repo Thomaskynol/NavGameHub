@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#121a10" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta
+      name="description"
+      content="VAVA2D — arena de tiro 2D top-down multiplayer para jogar com amigos no navegador."
+    />
+    <title>VAVA2D — arena top-down</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+      <div id="damage-flash" aria-hidden="true"></div>
+
+      <section id="menu-screen" class="screen">
+        <div class="menu-noise" aria-hidden="true"></div>
+        <div class="menu-card">
+          <header class="brand">
+            <p class="eyebrow">arena top-down · 2d · multiplayer</p>
+            <h1>VAVA<span>2D</span></h1>
+            <p class="tagline">
+              Pistola na mão, grama até o horizonte. Chame os amigos e desvie das balas.
+            </p>
+          </header>
+
+          <div class="field">
+            <label for="name-input">Seu nome</label>
+            <input
+              id="name-input"
+              type="text"
+              maxlength="16"
+              placeholder="Jogador"
+              autocomplete="nickname"
+              spellcheck="false"
+            />
+          </div>
+
+          <button id="create-room" class="btn primary" type="button">Criar sala</button>
+
+          <div class="divider"><span>ou entre em uma sala</span></div>
+
+          <div class="join-row">
+            <div class="field code-field">
+              <label for="room-code-input">Código</label>
+              <input
+                id="room-code-input"
+                type="text"
+                maxlength="4"
+                placeholder="ABCD"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <button id="join-room" class="btn" type="button">Entrar</button>
+          </div>
+
+          <p id="menu-error" class="menu-error" role="alert"></p>
+
+          <div class="controls">
+            <div><kbd>WASD</kbd><span>mover</span></div>
+            <div><kbd>MOUSE</kbd><span>mirar</span></div>
+            <div><kbd>CLIQUE</kbd><span>atirar</span></div>
+            <div><kbd>R</kbd><span>recarregar</span></div>
+            <div><kbd>SHIFT</kbd><span>dash</span></div>
+            <div><kbd>G</kbd><span>granada</span></div>
+          </div>
+
+          <p class="footnote">Até 8 jogadores por sala. Sem cadastro, sem download.</p>
+
+          <div class="lan-box">
+            <span class="lan-label">Jogar na rede local</span>
+            <div id="lan-links" class="lan-links">Carregando IPs…</div>
+          </div>
+        </div>
+        <p class="menu-version">MVP · v0.1</p>
+      </section>
+
+      <main id="hud" class="hidden">
+        <div class="top-bar">
+          <div class="top-left">
+            <div class="room-pill">SALA <strong id="hud-room-code">----</strong></div>
+            <button
+              id="leave-room"
+              class="leave-button"
+              type="button"
+              title="Sair da sala (Esc)"
+              aria-keyshortcuts="Escape"
+            >
+              Sair
+            </button>
+          </div>
+          <div class="match-clock" id="hud-timer">05:00</div>
+          <div class="ping-pill"><span id="hud-ping">--</span> ms</div>
+        </div>
+
+        <div id="waiting-banner" class="waiting-banner hidden">
+          <div class="waiting-copy">
+            <strong>Sala pronta.</strong>
+            <span>Aguardando jogadores <span id="waiting-count">1/8</span></span>
+          </div>
+          <button id="copy-link" class="btn small" type="button">Copiar link</button>
+          <span id="copy-hint" class="copy-hint" aria-live="polite"></span>
+        </div>
+
+        <aside class="leaderboard" aria-label="Placar">
+          <h3>PLACAR</h3>
+          <ol id="leaderboard-list"></ol>
+        </aside>
+
+        <div id="killfeed" class="killfeed" aria-live="polite"></div>
+
+        <section class="self-panel">
+          <div class="self-identity">
+            <span id="self-color" class="self-color"></span>
+            <span id="self-name">Jogador</span>
+          </div>
+          <div class="health-row">
+            <div class="bar health"><div id="health-fill"></div></div>
+            <span id="health-value">100</span>
+          </div>
+          <div class="dash-row">
+            <span class="dash-label">DASH</span>
+            <div class="bar dash"><div id="dash-fill"></div></div>
+          </div>
+          <div id="buffs" class="buffs"></div>
+          <div class="grenade-row">
+            <span class="grenade-label">GRANADA</span>
+            <div class="bar grenade"><div id="grenade-fill"></div></div>
+            <span id="grenade-value">PRONTO</span>
+          </div>
+        </section>
+
+        <section class="weapon-panel">
+          <div id="weapon-name" class="weapon-name">PISTOLA</div>
+          <div id="ammo-pips" class="ammo-pips" aria-hidden="true"></div>
+          <div class="ammo-line">
+            <span id="ammo-value">10</span><span class="ammo-sep">/</span
+            ><span id="ammo-max">10</span>
+          </div>
+          <div id="reload-row" class="reload-row hidden">
+            <div class="bar reload"><div id="reload-fill"></div></div>
+            <span>RECARREGANDO</span>
+          </div>
+          <div id="reload-hint" class="reload-hint">R · recarregar</div>
+        </section>
+
+        <div id="death-overlay" class="center-overlay hidden">
+          <div class="panel">
+            <p class="eyebrow">VOCÊ CAIU</p>
+            <h2 id="death-killer">Abatido</h2>
+            <p class="respawn-timer">Respawn em <strong id="respawn-count">3,0</strong>s</p>
+            <p class="muted">A câmera fica no local da queda.</p>
+          </div>
+        </div>
+
+        <div id="match-end-overlay" class="center-overlay hidden">
+          <div class="panel wide">
+            <p class="eyebrow">FIM DA PARTIDA</p>
+            <h2 id="match-winner">Vencedor</h2>
+            <ol id="final-scores" class="final-scores"></ol>
+            <p class="muted">Nova partida em <strong id="next-match-count">8</strong>s</p>
+          </div>
+        </div>
+
+        <div id="card-overlay" class="center-overlay hidden">
+          <div class="panel wide">
+            <p class="eyebrow">ESCOLHA UMA CARTA</p>
+            <h2 id="card-timer">10</h2>
+            <div id="card-options" class="card-options"></div>
+          </div>
+        </div>
+
+        <div id="connection-lost" class="center-overlay hidden">
+          <div class="panel">
+            <p class="eyebrow">CONEXÃO PERDIDA</p>
+            <h2>O servidor não respondeu.</h2>
+            <p class="muted">A sala fica disponível por 60 segundos após o último jogador sair.</p>
+            <button id="reload-page" class="btn primary" type="button">Recarregar</button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

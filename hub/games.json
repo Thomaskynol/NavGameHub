@@ -1,0 +1,47 @@
+{
+  "hubPort": 8090,
+  "games": [
+    {
+      "id": "arcade",
+      "name": "Asfalto Vivo",
+      "tagline": "Corrida arcade 3D",
+      "description": "Corrida de até seis pilotos em pistas 3D, com preparação e largada dentro do jogo.",
+      "minPlayers": 2,
+      "maxPlayers": 6,
+      "midMatchJoin": false,
+      "codeLength": 6,
+      "port": 8091,
+      "healthPath": "/api/info",
+      "accent": "#ff3d81",
+      "tags": ["corrida", "3D", "arcade"]
+    },
+    {
+      "id": "vava",
+      "name": "VAVA2D",
+      "tagline": "Arena top-down",
+      "description": "Arena de tiro top-down para até oito jogadores, com partidas de cinco minutos e entrada no meio da partida.",
+      "minPlayers": 2,
+      "maxPlayers": 8,
+      "midMatchJoin": true,
+      "codeLength": 4,
+      "port": 8092,
+      "healthPath": "/health",
+      "accent": "#00e5ff",
+      "tags": ["arena", "tiro", "2D"]
+    },
+    {
+      "id": "catan",
+      "name": "Catan Deluxe",
+      "tagline": "Tabuleiro multiplayer",
+      "description": "Partida de tabuleiro para três ou quatro jogadores, com comércio, construção e vitória por pontos.",
+      "minPlayers": 3,
+      "maxPlayers": 4,
+      "midMatchJoin": false,
+      "codeLength": 6,
+      "port": 8093,
+      "healthPath": "/health",
+      "accent": "#ffc247",
+      "tags": ["tabuleiro", "estratégia", "comércio"]
+    }
+  ]
+}

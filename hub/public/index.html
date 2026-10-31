@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06050d">
+  <meta name="description" content="Game Hub: catálogo, salas e partidas dos jogos de navegador na sua rede local.">
+  <title>Game Hub — arcade na sua rede</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body data-screen="boot">
+  <a class="skip-link" href="#main">Pular para o conteúdo</a>
+
+  <div class="bg-glow" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-floor" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <svg class="svg-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-crown" viewBox="0 0 24 24">
+      <path d="M3 8l4.2 3.1L12 5l4.8 6.1L21 8l-1.6 9H4.6L3 8z" fill="currentColor" stroke="none"/>
+      <path d="M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="8" y="8" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" fill="none" stroke="currentColor" stroke-width="1.8"/>
+    </symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24">
+      <path d="M19 12H5m6-6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24">
+      <path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 24 24">
+      <circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
+      <path d="M3.5 19c.6-3.1 2.7-5 5.5-5s4.9 1.9 5.5 5M16 5.5a3 3 0 0 1 0 5.7M17.5 14.2c1.8.5 3 2.1 3.4 4.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-exit" viewBox="0 0 24 24">
+      <path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8M10 12h10m-4-4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="m5 12.5 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </svg>
+
+  <header class="topbar">
+    <div class="brand" aria-label="Game Hub">
+      <span class="brand-mark" aria-hidden="true">GH</span>
+      <span class="brand-word" data-text="GAME//HUB">GAME<span class="brand-slash">//</span>HUB</span>
+      <span class="brand-tag">ARCADE LOCAL</span>
+    </div>
+    <div class="topbar-right">
+      <span id="connection-pill" class="connection-pill is-connecting" aria-hidden="true">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="connection-text">CONECTANDO</span>
+      </span>
+      <span id="nick-chip" class="nick-chip" hidden></span>
+    </div>
+  </header>
+
+  <div id="connection-banner" class="connection-banner" role="status" aria-live="polite" hidden></div>
+
+  <main id="main" tabindex="-1">
+    <section id="view-boot" data-screen="boot" class="screen screen-boot">
+      <div class="boot-shell">
+        <p class="eyebrow">ARCADE LOCAL // MAINFRAME</p>
+        <h1 class="boot-logo" aria-label="Game Hub">GAME<span class="text-magenta">//</span>HUB</h1>
+        <p id="boot-status" class="boot-status" role="status" aria-live="polite">Abrindo o canal com o servidor…</p>
+        <div class="boot-loader" aria-hidden="true"><span></span></div>
+        <button id="boot-retry" class="btn btn-ghost" type="button" hidden>TENTAR NOVAMENTE</button>
+        <p class="boot-hint">O Hub roda na sua rede local. Não é preciso internet.</p>
+      </div>
+    </section>
+
+    <section id="view-identity" data-screen="identity" class="screen screen-identity" hidden>
+      <div class="identity-shell">
+        <div class="identity-intro">
+          <p class="eyebrow">01 // IDENTIDADE</p>
+          <h1 id="identity-title" tabindex="-1">QUEM ESTÁ<br><span class="text-cyan">JOGANDO?</span></h1>
+          <p class="lede">Escolha um apelido. Ele vale para o Hub inteiro e acompanha você até o jogo e de volta.</p>
+          <ul class="rules">
+            <li><span class="rule-key">2–16</span><span>caracteres</span></li>
+            <li><span class="rule-key">ÚNICO</span><span>em todas as salas</span></li>
+            <li><span class="rule-key">A–Z 0–9 _ -</span><span>letras, números, espaço, _ e -</span></li>
+          </ul>
+        </div>
+        <form id="identity-form" class="panel identity-card" novalidate>
+          <p class="eyebrow">ENTRAR NO HUB</p>
+          <label for="nick-input" class="field-label">SEU APELIDO</label>
+          <input id="nick-input" class="text-input" name="nick" type="text" autocomplete="nickname"
+                 autocapitalize="words" spellcheck="false" enterkeyhint="go" maxlength="32"
+                 aria-describedby="nick-hint identity-error" placeholder="Ex.: Pixel, Ana_42, Capitão Lua">
+          <p id="nick-hint" class="field-hint">Sem conta e sem senha. Só o nome que a galera vai ver.</p>
+          <p id="identity-error" class="form-error" role="alert" hidden></p>
+          <button id="identity-submit" class="btn btn-primary btn-block" type="submit">ENTRAR NO HUB</button>
+          <p id="identity-conn" class="identity-conn">Conectando ao Hub…</p>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-home" data-screen="home" class="screen screen-home" hidden>
+      <div class="home-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">ARCADE LOCAL // <span id="hero-online">—</span> JOGOS ONLINE</p>
+          <h1 id="home-title" tabindex="-1">ESCOLHA O JOGO.<br><span class="text-magenta">CHAME A GALERA.</span></h1>
+          <p class="lede">Catálogo, salas e partidas no mesmo lugar. Sem conta, sem download, direto na sua rede local.</p>
+        </div>
+        <div class="hero-stats" aria-label="Resumo do Hub">
+          <div class="stat"><span id="stat-games">0</span><small>jogos</small></div>
+          <div class="stat"><span id="stat-rooms">0</span><small>salas ao vivo</small></div>
+          <div class="stat"><span>100%</span><small>offline</small></div>
+        </div>
+      </div>
+
+      <div class="home-layout">
+        <section class="panel catalog-panel" aria-labelledby="catalog-title">
+          <div class="panel-head">
+            <p class="section-index">01</p>
+            <h2 id="catalog-title">CATÁLOGO</h2>
+            <span id="catalog-count" class="count-badge">0</span>
+            <span class="panel-rule"></span>
+          </div>
+          <div id="game-grid" class="game-grid"></div>
+          <p id="catalog-empty" class="empty-state" hidden>O catálogo ainda não chegou. Verifique os jogos no servidor.</p>
+        </section>
+
+        <aside class="rooms-column">
+          <section class="panel join-panel" aria-labelledby="join-title">
+            <div class="panel-head">
+              <p class="section-index">02</p>
+              <h2 id="join-title">ENTRAR POR CÓDIGO</h2>
+              <span class="panel-rule"></span>
+            </div>
+            <form id="join-form" class="join-form" novalidate>
+              <label class="sr-only" for="join-code">Código da sala</label>
+              <input id="join-code" class="code-input" type="text" inputmode="text" autocomplete="off"
+                     autocapitalize="characters" spellcheck="false" maxlength="8" placeholder="A7K2"
+                     aria-describedby="join-error">
+              <button id="join-submit" class="btn btn-primary" type="submit">ENTRAR</button>
+            </form>
+            <p id="join-error" class="form-error" role="alert" hidden></p>
+            <p class="field-hint">Peça o código para quem criou a sala.</p>
+          </section>
+
+          <section class="panel rooms-panel" aria-labelledby="rooms-title">
+            <div class="panel-head">
+              <p class="section-index">03</p>
+              <h2 id="rooms-title">SALAS AO VIVO</h2>
+              <span id="rooms-count" class="count-badge">0</span>
+              <span class="panel-rule"></span>
+              <span class="live-dot" title="Atualiza sozinho" aria-label="Atualização automática"></span>
+            </div>
+            <ul id="room-list" class="room-list"></ul>
+            <p id="rooms-empty" class="empty-state" hidden>Nenhuma sala aberta. Crie a primeira e chame a galera.</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section id="view-room" data-screen="room" class="screen screen-room" hidden>
+      <div class="room-head">
+        <div class="room-head-main">
+          <p class="eyebrow">SALA // <span id="room-phase-eyebrow">AGUARDANDO</span></p>
+          <div class="room-code-line">
+            <h1 id="room-title" class="room-code" tabindex="-1"><span id="room-code">----</span></h1>
+            <button id="copy-code" class="icon-btn copy-code" type="button" aria-label="Copiar código da sala" title="Copiar código">
+              <svg class="icon" aria-hidden="true"><use href="#i-copy"></use></svg>
+            </button>
+          </div>
+          <p class="room-game-line"><span id="room-game-name">—</span><span class="sep">/</span><span id="room-host">Anfitrião: —</span></p>
+        </div>
+        <div class="room-head-side">
+          <span id="room-phase-tag" class="phase-tag">AGUARDANDO</span>
+          <button id="leave-room" class="btn btn-danger-ghost" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-exit"></use></svg>
+            <span id="leave-room-label">SAIR DA SALA</span>
+          </button>
+        </div>
+      </div>
+
+      <ol id="phase-steps" class="phase-steps" aria-label="Fase da sala">
+        <li data-phase="lobby"><span class="step-dot" aria-hidden="true"></span><span>LOBBY</span></li>
+        <li data-phase="launching"><span class="step-dot" aria-hidden="true"></span><span>PREPARANDO</span></li>
+        <li data-phase="playing"><span class="step-dot" aria-hidden="true"></span><span>EM PARTIDA</span></li>
+        <li data-phase="finished"><span class="step-dot" aria-hidden="true"></span><span>RESULTADOS</span></li>
+      </ol>
+
+      <div id="room-alert" class="room-alert" role="alert" hidden></div>
+
+      <div class="room-layout">
+        <div class="room-main">
+          <section id="ready-panel" class="panel ready-panel" aria-labelledby="ready-title">
+            <div class="ready-copy">
+              <p class="eyebrow">STATUS DO GRUPO</p>
+              <h2 id="ready-title" class="ready-title">Aguardando o grupo.</h2>
+              <p id="start-hint" class="start-hint">Marque pronto quando estiver tudo certo.</p>
+              <p id="min-warning" class="inline-warning" hidden></p>
+            </div>
+            <div class="ready-side">
+              <div class="ready-count">
+                <span id="ready-count">0/0</span>
+                <small>PRONTOS</small>
+              </div>
+              <button id="ready-btn" class="btn btn-ready" type="button" aria-pressed="false">ESTOU PRONTO</button>
+            </div>
+          </section>
+
+          <section id="waiting-panel" class="panel waiting-panel" aria-labelledby="waiting-title" hidden>
+            <p class="eyebrow">MODO ESPERA</p>
+            <h2 id="waiting-title">Aguardando a partida terminar</h2>
+            <p id="waiting-text" class="waiting-text">Você está na sala e entra assim que a partida atual terminar.</p>
+            <button id="room-leave-match" class="btn btn-ghost" type="button" hidden>VOLTAR À SALA</button>
+          </section>
+
+          <section class="panel room-info-panel" aria-labelledby="room-info-title">
+            <div class="panel-head">
+              <p class="section-index">02</p>
+              <h2 id="room-info-title">A SALA</h2>
+              <span class="panel-rule"></span>
+            </div>
+            <div class="info-grid">
+              <div class="info-cell"><small>CAPACIDADE</small><strong id="info-capacity">—</strong><span>configurada</span></div>
+              <div class="info-cell"><small>OCUPAÇÃO</small><strong id="info-occupancy">—</strong><span>na sala</span></div>
+              <div class="info-cell"><small>JOGADORES</small><strong id="info-players">—</strong><span id="info-players-note">mín. —</span></div>
+              <div class="info-cell"><small>VAGAS</small><strong id="info-slots">—</strong><span>livres</span></div>
+            </div>
+          </section>
+
+          <section class="panel settings-panel" aria-labelledby="settings-title">
+            <div class="panel-head">
+              <p class="section-index">03</p>
+              <h2 id="settings-title">CONFIGURAÇÃO</h2>
+              <span class="panel-rule"></span>
+            </div>
+            <p id="settings-lock" class="settings-lock"></p>
+            <div class="settings-grid">
+              <div>
+                <label class="field-label" for="room-game">JOGO</label>
+                <select id="room-game" class="select"></select>
+                <p id="room-game-hint" class="field-hint"></p>
+              </div>
+              <div>
+                <label class="field-label" for="room-capacity">CAPACIDADE</label>
+                <div class="stepper">
+                  <button id="room-cap-minus" class="stepper-btn" type="button" aria-label="Diminuir capacidade">−</button>
+                  <input id="room-capacity" class="stepper-input" type="number" inputmode="numeric" min="1" step="1">
+                  <button id="room-cap-plus" class="stepper-btn" type="button" aria-label="Aumentar capacidade">+</button>
+                </div>
+                <p id="room-cap-hint" class="field-hint"></p>
+              </div>
+            </div>
+            <p id="settings-error" class="form-error" role="alert" hidden></p>
+          </section>
+        </div>
+
+        <aside class="panel members-panel" aria-labelledby="members-title">
+          <div class="panel-head">
+            <p class="section-index">04</p>
+            <h2 id="members-title">PARTICIPANTES</h2>
+            <span id="members-count" class="count-badge">0/0</span>
+            <span class="panel-rule"></span>
+          </div>
+          <ul id="member-list" class="member-list"></ul>
+          <p class="members-legend">A coroa marca o anfitrião. Quem está desconectado não bloqueia o início.</p>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <section id="view-match" class="match-view" aria-label="Partida em andamento" hidden>
+    <header class="match-bar">
+      <div class="match-bar-left">
+        <span id="match-code" class="match-code">----</span>
+        <span class="match-divider" aria-hidden="true"></span>
+        <span id="match-game" class="match-game">—</span>
+      </div>
+      <div class="match-bar-center">
+        <span id="match-status" class="match-status"><span class="dot" aria-hidden="true"></span><span id="match-status-text">PARTIDA EM ANDAMENTO</span></span>
+        <div id="grace-track" class="grace-track" hidden aria-hidden="true"><span></span></div>
+      </div>
+      <button id="leave-match" class="btn btn-ghost match-back" type="button">
+        <svg class="icon" aria-hidden="true"><use href="#i-arrow-left"></use></svg>
+        VOLTAR À SALA
+      </button>
+    </header>
+    <div id="match-frame-wrap" class="match-frame-wrap"></div>
+  </section>
+
+  <div id="launch-overlay" class="launch-overlay" role="status" aria-live="polite" tabindex="-1" hidden>
+    <div class="launch-card">
+      <div class="launch-visual" aria-hidden="true">
+        <span class="ring ring-1"></span>
+        <span class="ring ring-2"></span>
+        <span class="ring ring-3"></span>
+        <span class="launch-core"></span>
+      </div>
+      <p class="eyebrow">SALA <span id="launch-code">----</span></p>
+      <h2>PREPARANDO A PARTIDA</h2>
+      <p id="launch-game" class="launch-game">—</p>
+      <div class="launch-track" aria-hidden="true"><span></span></div>
+      <p class="launch-hint">Conectando os jogadores ao jogo. Isso pode levar alguns segundos.</p>
+    </div>
+  </div>
+
+  <dialog id="create-dialog" class="dialog" aria-labelledby="create-title">
+    <form id="create-form" class="dialog-card" novalidate>
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">NOVA SALA</p>
+          <h2 id="create-title">ABRIR UMA SALA</h2>
+        </div>
+        <button id="create-close" class="icon-btn" type="button" aria-label="Fechar">
+          <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="dialog-body">
+        <label class="field-label" for="create-game">JOGO</label>
+        <select id="create-game" class="select"></select>
+        <p id="create-game-meta" class="field-hint"></p>
+
+        <label class="field-label" for="create-capacity">CAPACIDADE</label>
+        <div class="stepper">
+          <button id="create-cap-minus" class="stepper-btn" type="button" aria-label="Diminuir capacidade">−</button>
+          <input id="create-capacity" class="stepper-input" type="number" inputmode="numeric" min="1" value="2" step="1">
+          <button id="create-cap-plus" class="stepper-btn" type="button" aria-label="Aumentar capacidade">+</button>
+        </div>
+        <p id="create-cap-hint" class="field-hint"></p>
+        <p id="create-min-warning" class="inline-warning" hidden></p>
+        <p id="create-error" class="form-error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-foot">
+        <button id="create-cancel" class="btn btn-ghost" type="button">CANCELAR</button>
+        <button id="create-submit" class="btn btn-primary" type="submit">CRIAR SALA</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toast-stack">
+    <div id="toast-polite" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+    <div id="toast-assertive" class="toast-region" aria-live="assertive" aria-atomic="false"></div>
+  </div>
+
+  <template id="tpl-game">
+    <article class="game-card">
+      <div class="game-card-top">
+        <span class="game-index"></span>
+        <span class="status-tag game-status"><span class="dot" aria-hidden="true"></span><span class="status-text"></span></span>
+      </div>
+      <div class="game-card-body">
+        <p class="game-tagline"></p>
+        <h3 class="game-name"></h3>
+        <p class="game-desc"></p>
+        <div class="game-tags"></div>
+      </div>
+      <div class="game-card-foot">
+        <div class="game-meta">
+          <span class="meta-item"><svg class="icon" aria-hidden="true"><use href="#i-users"></use></svg><span class="players"></span></span>
+          <span class="meta-item game-midjoin"></span>
+        </div>
+        <button class="btn btn-card create-game-btn" type="button">
+          <span class="btn-label">CRIAR SALA</span>
+          <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+        </button>
+      </div>
+    </article>
+  </template>
+
+  <template id="tpl-room-row">
+    <li class="room-row">
+      <div class="room-row-main">
+        <span class="room-code-chip"></span>
+        <div class="room-info">
+          <p class="room-game"></p>
+          <p class="room-host"></p>
+        </div>
+      </div>
+      <div class="room-row-meta">
+        <span class="room-occupancy"></span>
+        <span class="phase-tag room-phase"></span>
+        <button class="btn btn-small join-room-btn" type="button">ENTRAR</button>
+      </div>
+    </li>
+  </template>
+
+  <template id="tpl-member">
+    <li class="member-row">
+      <span class="member-signal" aria-hidden="true"><span class="dot"></span></span>
+      <div class="member-main">
+        <p class="member-nick-line">
+          <svg class="icon icon-crown" aria-hidden="true" hidden><use href="#i-crown"></use></svg>
+          <span class="member-nick"></span>
+          <span class="member-you" hidden>VOCÊ</span>
+        </p>
+        <p class="member-sub">
+          <span class="member-role"></span>
+          <span class="member-conn"></span>
+        </p>
+      </div>
+      <span class="ready-tag"><span class="dot" aria-hidden="true"></span><span class="ready-text"></span></span>
+    </li>
+  </template>
+
+  <template id="tpl-toast">
+    <div class="toast">
+      <span class="toast-mark" aria-hidden="true"></span>
+      <p class="toast-text"></p>
+      <button class="toast-close" type="button" aria-label="Fechar aviso">
+        <svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg>
+      </button>
+    </div>
+  </template>
+</body>
+</html>

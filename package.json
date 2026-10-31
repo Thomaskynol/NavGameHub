@@ -1,0 +1,25 @@
+{
+  "name": "game-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hub local para jogos de navegador em grupo",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "setup": "bash prepare.sh",
+    "start": "bash start.sh",
+    "stop": "bash stop.sh",
+    "test": "npm run test:hub && npm run test:games",
+    "test:hub": "node --test \"hub/test/**/*.test.js\"",
+    "test:games": "npm --prefix Games/ArcadeAI_race_game test && npm --prefix Games/Catan test && npm --prefix Games/VAVA2D test",
+    "e2e": "node test/e2e/run.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

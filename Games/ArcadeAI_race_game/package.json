@@ -1,0 +1,22 @@
+{
+  "name": "asfalto-vivo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Asfalto Vivo — jogo de corrida arcade 3D multiplayer para navegador",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test",
+    "check:tracks": "node tools/check_tracks.js"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

@@ -1,0 +1,113 @@
+/* Asfalto Vivo — tokens, reset e tipografia base.
+   Identidade: asfalto escuro + destaque quente (brasa/laranja), formas
+   geométricas (cantos cortados, diagonais), números tabulares de cronômetro. */
+
+:root {
+  --bg0: #0b0d12;          /* fundo asfalto */
+  --bg1: #12151d;          /* superfície */
+  --bg2: #1a1f2b;          /* painel elevado */
+  --bg3: #232a3a;          /* hover de painel */
+  --line: #2c3446;
+  --line-soft: #232a3a;
+
+  --ink: #eef1f6;
+  --ink-dim: #9aa3b5;
+  --ink-faint: #6b7488;
+
+  --accent: #ff7a18;       /* brasa */
+  --accent-2: #ffc24b;     /* âmbar */
+  --accent-deep: #c94e0a;
+  --accent-ink: #1a0d02;
+  --accent-glow: rgba(255, 122, 24, 0.35);
+
+  --ok: #34c26b;
+  --warn: #f5a524;
+  --err: #ff5c63;
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, "Roboto Mono", monospace;
+
+  --r-cut: 12px;           /* profundidade do canto cortado padrão */
+  --pad: clamp(12px, 2.2vmin, 22px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg0);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Malha de asfalto: textura geométrica sutil atrás de tudo. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 700px at 75% -10%, rgba(255, 122, 24, 0.08), transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, rgba(255, 194, 75, 0.05), transparent 55%),
+    repeating-linear-gradient(115deg, transparent 0 46px, rgba(255, 255, 255, 0.016) 46px 47px);
+  z-index: 0;
+}
+
+#av-ui {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;      /* telas reativam; o canvas do jogo fica abaixo */
+}
+#av-ui button,
+#av-ui input,
+#av-ui select,
+#av-ui label,
+#av-ui a,
+#av-ui .screen {
+  pointer-events: auto;
+}
+
+h1, h2, h3, h4, p, ul, ol, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+button { font: inherit; color: inherit; }
+canvas { display: block; }
+
+/* Foco sempre visível (teclado). */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+/* Barra de rolagem discreta nos painéis. */
+.scroll-y { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.scroll-y::-webkit-scrollbar { width: 8px; }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+}
