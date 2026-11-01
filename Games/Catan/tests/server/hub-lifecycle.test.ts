@@ -91,7 +91,7 @@ describe('hub htok: ciclo de vida e identidade', () => {
     // Idempotente: fechar de novo continua ok.
     const closeAgain = await postClose(h, code);
     expect(closeAgain.status).toBe(200);
-    expect(closeAgain.body).toEqual({ ok: true });
+    expect(closeAgain.body).toEqual({ ok: true, closed: false });
     // Reutilização: mesmo código cria de novo, sem CODE_TAKEN.
     const s2 = await h.connect();
     const reused = await lobby(s2, { type: 'create_room', nickname: 'Bia', roomCode: code });
@@ -164,7 +164,7 @@ describe('hub htok: ciclo de vida e identidade', () => {
     const code = 'LGDCF4';
     const created = await lobby(s, { type: 'create_room', nickname: 'Ana', roomCode: code });
     expect(created.ok).toBe(true);
-    expect((await postClose(h, code)).body).toEqual({ ok: true });
+    expect((await postClose(h, code)).body).toEqual({ ok: true, closed: true });
     expect((await getState(h, code)).status).toBe(404);
   });
 

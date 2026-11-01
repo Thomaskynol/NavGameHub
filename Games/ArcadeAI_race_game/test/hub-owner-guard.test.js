@@ -166,7 +166,13 @@ test('close: dono correto fecha; dono diferente/sem htok recusam; htok vs sala s
 
     r = await httpClose(base, headers, CODE, 'hub-a');
     assert.equal(r.status, 200, 'dono fecha');
+    assert.deepEqual(r.body, { ok: true, closed: true }, 'dono fecha com closed:true');
     assert.equal(srv.rooms.getRoom(CODE), null, 'sala fechada pelo dono');
+
+    // Repetição idempotente: sala já fechada → 200 { ok:true, closed:false }.
+    r = await httpClose(base, headers, CODE, 'hub-a');
+    assert.equal(r.status, 200, 'repetição idempotente');
+    assert.deepEqual(r.body, { ok: true, closed: false }, 'repetição informa closed:false');
 
     // Sala sem dono: sem htok fecha (legado); com htok recusa.
     const CODE2 = 'KK77LL';
@@ -179,9 +185,23 @@ test('close: dono correto fecha; dono diferente/sem htok recusam; htok vs sala s
     assert.ok(srv.rooms.getRoom(CODE2), 'sala sem dono intacta');
     r = await httpClose(base, headers, CODE2, null);
     assert.equal(r.status, 200, 'sem htok fecha sala sem dono (legado)');
+    assert.deepEqual(r.body, { ok: true, closed: true }, 'legado fecha com closed:true');
     assert.equal(srv.rooms.getRoom(CODE2), null);
   } finally {
     for (const ws of sockets) { try { ws.terminate(); } catch { /* ok */ } }
+    await srv.close();
+  }
+});
+
+test('close idempotente: código inexistente retorna 200 { ok:true, closed:false }', async () => {
+  const srv = await startServer({ port: 0, tracks: TRACKS, secret: 't', timings: { reconnectMs: 5000 } });
+  try {
+    const base = `http://127.0.0.1:${srv.port}`;
+    const headers = { 'x-hub-secret': 't', 'content-type': 'application/json' };
+    const r = await httpClose(base, headers, 'ZZ99YY', 'hub-qualquer');
+    assert.equal(r.status, 200, 'inexistente é idempotente');
+    assert.deepEqual(r.body, { ok: true, closed: false }, 'inexistente informa closed:false');
+  } finally {
     await srv.close();
   }
 });
@@ -199,6 +219,7 @@ test('reuso do código por partida nova não é atingido por close antigo', asyn
     await wsSendRecv(ws1, { t: 'create', name: 'Velha', color: C1, room: CODE, htok: 'hub-old' });
     const r1 = await httpClose(base, headers, CODE, 'hub-old');
     assert.equal(r1.status, 200);
+    assert.deepEqual(r1.body, { ok: true, closed: true });
 
     // Partida nova reusa o código com outro dono.
     const ws2 = await wsOpen(srv.port);

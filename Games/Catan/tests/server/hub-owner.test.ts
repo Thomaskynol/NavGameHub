@@ -130,7 +130,7 @@ describe('hub dono: state, join e close', () => {
 
     const right = await postClose(h, 'CLS444', 'dono-c1');
     expect(right.status).toBe(200);
-    expect(right.body).toEqual({ ok: true });
+    expect(right.body).toEqual({ ok: true, closed: true });
     expect((await getState(h, 'CLS444')).status).toBe(404);
     // Idempotente em sala inexistente.
     expect((await postClose(h, 'CLS444', 'dono-c1')).status).toBe(200);

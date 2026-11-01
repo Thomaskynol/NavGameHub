@@ -110,6 +110,25 @@ test('state inclui hubOwner (token ou null); close estrito com 403', () => {
   assert.equal(fakeCall(handler, 'GET', '/__hub/state?room=CD34', headers).status, 404);
 });
 
+test('close idempotente: repetição e código inexistente retornam 200 { ok:true, closed:false }', () => {
+  const rooms = new RoomManager();
+  rooms.createWithCode('AB23', 'tok-dono');
+  const handler = createRequestHandler({ rooms, secret: SECRET, hubTestHooks: false });
+  const headers = { 'x-hub-secret': SECRET };
+
+  const first = fakeCall(handler, 'POST', '/__hub/close?room=AB23&htok=tok-dono', headers);
+  assert.equal(first.status, 200);
+  assert.deepEqual(JSON.parse(first.body), { ok: true, closed: true });
+
+  const repeat = fakeCall(handler, 'POST', '/__hub/close?room=AB23&htok=tok-dono', headers);
+  assert.equal(repeat.status, 200);
+  assert.deepEqual(JSON.parse(repeat.body), { ok: true, closed: false });
+
+  const missing = fakeCall(handler, 'POST', '/__hub/close?room=ZZ99&htok=tok-qualquer', headers);
+  assert.equal(missing.status, 200);
+  assert.deepEqual(JSON.parse(missing.body), { ok: true, closed: false });
+});
+
 test('close: htok em sala sem dono → 403 e preserva; sem htok fecha', () => {
   const rooms = new RoomManager();
   rooms.createWithCode('EF56');
@@ -381,8 +400,13 @@ test('servidor real: close atrasado com htok alheio não derruba sala (a–g)', 
 
   res = await hubClose('AB23', 'tok-partida-nova');
   assert.equal(res.status, 200, '(a) dono fecha');
+  assert.deepEqual(JSON.parse(res.body), { ok: true, closed: true }, '(a) dono fecha com closed:true');
   state = await hubState(port, 'AB23');
   assert.equal(state.status, 404, 'sala do dono fechada');
+
+  res = await hubClose('AB23', 'tok-partida-nova');
+  assert.equal(res.status, 200, 'repetição idempotente');
+  assert.deepEqual(JSON.parse(res.body), { ok: true, closed: false }, 'repetição informa closed:false');
 
   // (g) segredo errado → 403; state de sala inexistente → 404.
   const bad = await fetch(`http://127.0.0.1:${port}/__hub/close?room=AB23`, {

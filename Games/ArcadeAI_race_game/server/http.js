@@ -132,8 +132,8 @@ export function createHttpHandler({
           return;
         }
       }
-      if (rooms) rooms.closeRoom(code);
-      sendJson(res, 200, { ok: true });
+      const closed = rooms ? rooms.closeRoom(code) : false;
+      sendJson(res, 200, { ok: true, closed });
       return;
     }
 

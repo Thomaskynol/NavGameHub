@@ -1005,8 +1005,10 @@ export function createHub(options = {}) {
   // colisão (sala existe), reserva outro candidato — ainda sob o mutex.
   // Com dono divergente (outro htok ou null) é CONFLITO: nunca adota a sala
   // alheia — gera novo código (até o limite) em vez de mandar o grupo para lá.
-  // Erro de rede/timeout é tolerado aqui (tenta de novo até o prazo); se
-  // esgotar as tentativas, marca falha para failLaunch fora do mutex.
+  // Código bloqueado por histórico (409 taken) é o mesmo caminho: conta como
+  // conflito e tenta outro, sem apagar dados. Erro de rede/timeout é tolerado
+  // aqui (tenta de novo até o prazo); se esgotar as tentativas, marca falha
+  // para failLaunch fora do mutex.
   async function verifyLaunchCode(room, game) {
     for (let attempt = 0; attempt < 10; attempt += 1) {
       if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
@@ -1017,6 +1019,19 @@ export function createHub(options = {}) {
       const state = await fetchGameState(game, room.match.gameCode);
       if (!rooms.has(room.code) || room.phase !== 'launching' || !room.match) return;
       if (state.kind === 'free') return;
+      if (state.kind === 'taken') {
+        room.match.conflicts = (room.match.conflicts || 0) + 1;
+        logAt('warn', `[hub] código ${room.match.gameCode} (${game.id}) bloqueado por histórico: conflito ${room.match.conflicts}, tentando novo código.`);
+        if (room.match.conflicts > MAX_CONFLICT_RETRIES) {
+          room.match.failed = 'conflict';
+          return;
+        }
+        if (!reserveLaunchCode(room, game)) {
+          room.match.failed = 'conflict';
+          return;
+        }
+        continue;
+      }
       if (state.kind === 'exists') {
         if (!ownsRoomState(state, room.match.htok)) {
           room.match.conflicts = (room.match.conflicts || 0) + 1;
@@ -1075,13 +1090,43 @@ export function createHub(options = {}) {
         room.launchTimer = setTimeout(tick, timings.launchPollInterval);
         return;
       }
+      // Histórico bloqueado após o create (409 taken): o create do criador
+      // recebeu CODE_TAKEN. Mesmo caminho do conflito pós-create: novo código
+      // com o mesmo htok, sem mandar ninguém à sala alheia.
+      if (state.kind === 'taken') {
+        room.match.conflicts = (room.match.conflicts || 0) + 1;
+        logAt('warn', `[hub] código ${current} (${game.id}) bloqueado por histórico após create: conflito ${room.match.conflicts}, tentando novo código.`);
+        if (room.match.conflicts > MAX_CONFLICT_RETRIES || now() >= room.launch.deadline) {
+          failLaunch(room, 'LAUNCH_CONFLICT');
+          return;
+        }
+        if (!reserveLaunchCode(room, game)) {
+          failLaunch(room, 'LAUNCH_CONFLICT');
+          return;
+        }
+        const nextTaken = room.match.gameCode;
+        room.launch.code = nextTaken;
+        let creatorTaken = room.members.find((m) => m.id === room.launch.creatorId);
+        if (!creatorTaken || !creatorTaken.connected) {
+          creatorTaken = oldestConnectedPlayer(room);
+          if (!creatorTaken) {
+            failLaunch(room, 'LAUNCH_CONFLICT');
+            return;
+          }
+          room.launch.creatorId = creatorTaken.id;
+        }
+        sendPlay(creatorTaken, room, true);
+        roomChanged(room);
+        room.launchTimer = setTimeout(tick, timings.launchPollInterval);
+        return;
+      }
       if (state.kind === 'exists') {
         if (!ownsRoomState(state, room.match.htok)) {
           // CONFLITO pós-create: outro dono ocupou o código (o create do
           // criador recebeu CODE_TAKEN no jogo). Nunca envia play para a sala
           // alheia: reserva novo código e reemite play create=1 ao criador.
           room.match.conflicts = (room.match.conflicts || 0) + 1;
-          logAt('warn', `[hub] código ${code} (${game.id}) com outro dono após create: conflito ${room.match.conflicts}, tentando novo código.`);
+          logAt('warn', `[hub] código ${current} (${game.id}) com outro dono após create: conflito ${room.match.conflicts}, tentando novo código.`);
           if (room.match.conflicts > MAX_CONFLICT_RETRIES || now() >= room.launch.deadline) {
             failLaunch(room, 'LAUNCH_CONFLICT');
             return;
@@ -1330,6 +1375,12 @@ export function createHub(options = {}) {
         { headers: { 'x-hub-secret': secret }, signal: controller.signal },
       );
       if (response.status === 404) return { kind: 'free' };
+      // 409 = código bloqueado por histórico (Catan preserva dados e responde
+      // CODE_TAKEN no create). Não é livre e não é erro transitório: o Hub
+      // deve tentar outro código, nunca mandar o grupo para lá. Erro de
+      // leitura do banco no jogo responde 500 e cai em 'error' (tolerado até
+      // o prazo), nunca como CODE_TAKEN.
+      if (response.status === 409) return { kind: 'taken' };
       if (!response.ok) return { kind: 'error' };
       const body = await response.json().catch(() => null);
       if (body && body.ok && body.room) return { kind: 'exists', room: body.room };
@@ -1397,12 +1448,18 @@ export function createHub(options = {}) {
       result = null;
     }
     if (result && result.notMine) return finish(result);
-    if (!result || (!result.closed && result.status !== 404)) {
+    // Sucesso documentado (200, mesmo com closed:false) = confirmado, sem
+    // retry. Recusa (403/409) = notMine sem retry. 404 = idempotente sem retry.
+    // Só tenta de novo em falha de rede ou 5xx — uma falha isolada não derruba
+    // a limpeza, mas sucesso e recusa nunca insistem.
+    if (result && (result.status === 200 || result.status === 404)) return finish(result);
+    if (!result || result.status === 0 || (result.status >= 500 && result.status < 600)) {
       // Uma falha isolada não derruba a limpeza: tenta de novo uma vez.
       await sleep(200);
       try {
         const second = await sendOnce();
         if (second.notMine) return finish(second);
+        if (second.status === 200 || second.status === 404) return finish(second);
         result = second;
       } catch {
         if (!result) result = { status: 0, closed: false, notMine: false };

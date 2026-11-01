@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import {
-  HubClient, hubPost, gameCodeOf, uniqNick, waitOnline,
+  HubClient, hubPost, gameCodeOf, htokOf, uniqNick, waitOnline,
   E2E, REPO_ROOT, proofLine,
 } from './e2e-helpers.mjs';
 
@@ -54,17 +54,22 @@ await hub[0].setReady(true);
 await hub[1].setReady(true);
 const playP = hub[0].waitPlay(1);
 await hub[2].setReady(true);
-const gameCode = gameCodeOf(await playP);
+const playMsg = await playP;
+const gameCode = gameCodeOf(playMsg);
+const htok = htokOf(playMsg);
 console.log(`[f6] launching gameCode=${gameCode} (len ${gameCode?.length})`);
 check('game code catan tem 6 chars', gameCode && gameCode.length === 6);
+check('play traz htok do launch', typeof htok === 'string' && htok.length >= 16, String(htok).slice(0, 8));
 
 // Lado do jogo: create_room com roomCode do Hub + joins + ready + start.
+// Como o cliente real (Games/Catan/src/client/App.tsx): leva hubToken (htok)
+// do play no create e nos joins; sem htok o Hub veria outro dono e daria retry.
 const g = [];
 for (const n of nicks) g.push(await catanConnect());
-let res = await lobby(g[0], { type: 'create_room', nickname: nicks[0], roomCode: gameCode });
+let res = await lobby(g[0], { type: 'create_room', nickname: nicks[0], roomCode: gameCode, ...(htok ? { hubToken: htok } : {}) });
 check('catan create_room com roomCode do Hub', res.ok === true, JSON.stringify(res).slice(0, 160));
 for (let i = 1; i < 3; i += 1) {
-  res = await lobby(g[i], { type: 'join_room', code: gameCode, nickname: nicks[i] });
+  res = await lobby(g[i], { type: 'join_room', code: gameCode, nickname: nicks[i], ...(htok ? { hubToken: htok } : {}) });
   check(`catan join ${nicks[i]}`, res.ok === true, res.ok ? '' : JSON.stringify(res).slice(0, 160));
 }
 for (let i = 0; i < 3; i += 1) {

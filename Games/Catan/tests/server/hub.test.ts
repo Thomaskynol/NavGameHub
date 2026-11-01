@@ -124,13 +124,13 @@ describe('hub: estado e fechamento', () => {
 
     const close = await postHub(h, '/__hub/close', code);
     expect(close.status).toBe(200);
-    expect(close.body).toEqual({ ok: true });
+    expect(close.body).toEqual({ ok: true, closed: true });
     const gone = await getState(h, code);
     expect(gone.status).toBe(404);
     // Idempotente.
     const closeAgain = await postHub(h, '/__hub/close', code);
     expect(closeAgain.status).toBe(200);
-    expect(closeAgain.body).toEqual({ ok: true });
+    expect(closeAgain.body).toEqual({ ok: true, closed: false });
   });
 
   it('close exige segredo', async () => {

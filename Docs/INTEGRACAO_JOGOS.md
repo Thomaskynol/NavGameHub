@@ -58,7 +58,7 @@ Cabeçalho obrigatório: `x-hub-secret: <HUB_SECRET>`. Segredo errado → `403 {
 } }
 ```
 
-Sala inexistente → `404 { ok:false, error:'NOT_FOUND' }`. O Hub usa assim:
+Sala inexistente → `404 { ok:false, error:'NOT_FOUND' }` (livre). Código bloqueado por histórico preservado → `409 { ok:false, error:'CODE_TAKEN' }` (item 1 abaixo: o Hub trata como conflito e tenta outro código). O Hub usa assim:
 
 - após `create=1`, consulta a cada 300 ms por até 12 s: quando a sala existe **e o dono confere (`hubOwner === htok` do launch)**, manda os demais jogadores (`create=0`) e a fase do Hub vira `playing`. Sala existente com outro dono, `null` **ou campo ausente** é **CONFLITO**: o Hub nunca envia `play` para lá nem a considera `playing` válida — reserva um novo código e tenta de novo (até o limite; esgotado, a sala volta ao `lobby` com `LAUNCH_CONFLICT`, sem prender o grupo);
 - durante a partida, consulta a cada 1,5 s: `results`/`ended` encerra; 3 respostas 404 seguidas também encerram; sala existente com `hubOwner` divergente/ausente conta como ausência (nunca adota a sala alheia). Erro persistente de rede → **FALHA** (`GAME_FAILED`, nunca como fim normal) e volta a `lobby` utilizável; erro isolado nunca encerra nada.
@@ -67,13 +67,15 @@ Mapeie as fases internas do jogo para as três do contrato e defina `joinable` c
 
 ### `POST /__hub/close?room=CODE&htok=TOKEN`
 
-Remove a sala e libera recursos. Idempotente; responde `{ ok:true }` (e, se souber se removeu, `closed: true|false` — o Hub só registra "fechado" com `200 { closed:true }`). O Hub chama ~5 s depois de devolver a turma ao lobby, com o `htok` do launch. Regras:
+Remove a sala e libera recursos. Idempotente: sucesso ou sala inexistente/repetição → `200 { ok:true, closed:true|false }` (`closed:true` = removeu agora; `closed:false` = nada a fazer — o Hub só registra "fechado" com `200 { closed:true }`). Os três jogos retornam `closed`. O Hub chama ~5 s depois de devolver a turma ao lobby, com o `htok` do launch. Regras:
 
 - com dono (`htok` guardado na criação): só fecha se o `htok` conferir; divergente/ausente → `403 { ok:false, error:'FORBIDDEN' }` e a sala segue intacta (protege reutilização do código por outra partida);
 - sem dono (manual/legada): só fecha sem `htok` (legítimo); COM `htok` → `403 FORBIDDEN` e preserva (não misturar close afiliado com sala independente);
 - sala inexistente → `200` idempotente (nada a fazer).
 
-Do lado do Hub: `403`/`409` significam "não é minha" — o Hub registra, **não insiste** (sem retry destrutivo) e nunca trata como fechado. Falha de rede: uma nova tentativa; depois best-effort.
+Do lado do Hub: `403`/`409` no close significam "não é minha" — o Hub registra, **não insiste** (sem retry destrutivo) e nunca trata como fechado. `200` documentado (mesmo `closed:false`) e `404` também não insistem; só falha de rede ou 5xx tenta 1×, depois best-effort.
+
+> Item 1 (solução Lane A, implementada; detalhe normativo em `hub/PROTOCOLO.md`): **state distingue livre (404) × bloqueado por histórico (409 `CODE_TAKEN`)** — o Catan preserva o histórico e bloqueia a reutilização do código sem apagar dados. O Hub trata 409 como conflito (com limite, tenta outro código com o mesmo `htok`, nunca manda o grupo à sala alheia). Erro de banco no jogo responde 500, nunca `CODE_TAKEN`.
 
 ### Códigos de sala
 

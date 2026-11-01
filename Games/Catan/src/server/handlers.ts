@@ -816,11 +816,12 @@ function runHook(ctx: AppContext, room: Room, hook: HookCommand): CommandRespons
  * tardio de uma partida antiga nunca atinge a partida nova que reutilizou o
  * código. Sem dono (legado, hubToken ''): só fecha sem htok (legítimo ao jogo);
  * COM htok => 403 e preserva (close afiliado atrasado de outra partida).
- * Sala inexistente => ok (nada a fazer, 200 idempotente). */
-export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknown): { ok: true } | { ok: false; error: 'FORBIDDEN' } {
+ * Sala inexistente => {ok:true, closed:false} (200 idempotente, nada a fazer).
+ * Sucesso com sala => {ok:true, closed:true}. */
+export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknown): { ok: true; closed: boolean } | { ok: false; error: 'FORBIDDEN' } {
   const code = String(rawCode ?? '').toUpperCase().trim();
   const room = ctx.store.rooms.get(code);
-  if (!room) return { ok: true };
+  if (!room) return { ok: true, closed: false };
   // shortcut: dono confere por igualdade; sem dono, htok presente é de outra partida.
   const provided = typeof rawToken === 'string' ? rawToken.trim() : '';
   if (room.hubToken !== '') {
@@ -843,7 +844,7 @@ export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknow
   });
   ctx.store.rooms.delete(room.code);
   logInfo('hub_room_closed', { roomCode: room.code });
-  return { ok: true };
+  return { ok: true, closed: true };
 }
 
 /** Hook de teste do Hub (HUB_TEST_HOOKS=1): declara vitória e vai para game_over. */
