@@ -137,7 +137,7 @@ Cabeçalho obrigatório: `x-hub-secret: <HUB_SECRET>`. Sem segredo correto → `
 
 Sala inexistente → `404 { ok:false, error:'NOT_FOUND' }`.
 
-`hubOwner` é o dono da partida (o `htok` do launch que criou a sala; `null` quando a sala não tem dono — manual/legada). O Hub confere `hubOwner === htok` esperado após o create e em todo poll: divergência (outro dono ou `null`) = CONFLITO (nunca envia `play` para lá, nunca considera `playing` válido, nunca fecha a sala alheia; tenta novo código até o limite, depois `LAUNCH_CONFLICT`). Transição: jogos que ainda não informam a chave são aceitos provisoriamente como próprios; com a chave presente a conferência é estrita.
+`hubOwner` é o dono da partida (o `htok` do launch que criou a sala; `null` quando a sala não tem dono — manual/legada). O Hub confere `hubOwner === htok` esperado após o create e em todo poll: divergência (outro dono ou `null`) = CONFLITO (nunca envia `play` para lá, nunca considera `playing` válido, nunca fecha a sala alheia; tenta novo código até o limite, depois `LAUNCH_CONFLICT`). Campo ausente ou não-string = resposta incompatível: o Hub trata como sala alheia (CONFLITO/ausência), nunca envia `play` para lá.
 
 Mapeamento:
 - Arcade: `lobby → lobby`, `countdown|race → playing`, `results → results`; `joinable = status === 'lobby'`; `players = room.players.length`.
@@ -148,7 +148,7 @@ Mapeamento:
 
 Remove a sala do jogo e libera recursos. Idempotente. Responde `{ ok:true }`.
 
-Com dono (`htok` guardado na criação): só fecha se o `htok` conferir; divergente/ausente → `403 { ok:false, error:'FORBIDDEN' }` e a sala segue intacta — protege reutilização do código por outra partida (R2). Sala sem dono (manual/legada) fecha livremente.
+Com dono (`htok` guardado na criação): só fecha se o `htok` conferir; divergente/ausente → `403 { ok:false, error:'FORBIDDEN' }` e a sala segue intacta — protege reutilização do código por outra partida (R2). Sala sem dono (manual/legada): só fecha sem `htok` (legítimo); COM `htok` → `403 FORBIDDEN` e preserva (close afiliado atrasado de outra partida). Sala inexistente → `200` idempotente.
 
 Do lado do Hub: `403`/`409` no close significam "não é minha" — o Hub registra o resultado (últimos fechamentos expostos no diagnóstico interno), **não insiste** (sem retry destrutivo) e nunca trata como fechado. Só conta como fechado `200 { closed:true }`.
 

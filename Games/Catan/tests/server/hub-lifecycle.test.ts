@@ -1,7 +1,7 @@
 // Ciclo de vida com identidade (htok): códigos fechados liberados, reutilização
 // segura, fechamento tardio vs partida nova, retentativa legítima vs colisão.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { openDb, insertRoom, persistRoomUpdate, roomCodeExists } from '../../src/server/db';
+import { insertChatRow, insertMember, insertRoom, openDb, persistRoomUpdate, roomCodeExists, tx } from '../../src/server/db';
 import { lobby, startHarness, type Harness } from './harness';
 
 const SECRET = 'hub-test-secret-lifecycle';
@@ -48,17 +48,31 @@ describe('hub htok: ciclo de vida e identidade', () => {
     restoreHubEnv();
   });
 
-  it('código histórico fechado (v1) não bloqueia reutilização', () => {
+  it('código com histórico (mesmo fechado) bloqueia reutilização e preserva dados', () => {
     const db = openDb(':memory:');
     try {
       insertRoom(db, { code: 'WXYZA', name: 'old', hostPlayerId: 'p1', phase: 'lobby', version: 0, boardSeed: 's', createdAt: 1 });
+      db.prepare(
+        'INSERT INTO members (room_code, player_id, name, color, recovery_hash, is_host, ready, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run('WXYZA', 'p1', 'Ana', 'red', 'h1', 1, 0, 1);
+      db.prepare('INSERT INTO chat (id, room_code, player_id, name, color, text, at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+        'c1',
+        'WXYZA',
+        'p1',
+        'Ana',
+        'red',
+        'historico',
+        1,
+      );
       persistRoomUpdate(db, { roomCode: 'WXYZA', closed: true, updatedAt: 2 });
-      // Fechada some da lista mas não pode bloquear código novo.
-      expect(roomCodeExists(db, 'WXYZA')).toBe(false);
-      // Reutiliza o mesmo código na mesma transação do create.
+      // Histórico bloqueia: Hub recebe CODE_TAKEN e tenta outro código, nunca sobrescreve.
+      expect(roomCodeExists(db, 'WXYZA')).toBe(true);
       expect(() =>
         insertRoom(db, { code: 'WXYZA', name: 'new', hostPlayerId: 'p2', phase: 'lobby', version: 0, boardSeed: 's', createdAt: 3 }),
-      ).not.toThrow();
+      ).toThrow();
+      // Preservados automaticamente.
+      expect((db.prepare('SELECT COUNT(*) AS n FROM members WHERE room_code = ?').get('WXYZA') as { n: number }).n).toBe(1);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM chat WHERE room_code = ?').get('WXYZA') as { n: number }).n).toBe(1);
       expect(roomCodeExists(db, 'WXYZA')).toBe(true);
     } finally {
       db.close();
@@ -152,5 +166,103 @@ describe('hub htok: ciclo de vida e identidade', () => {
     expect(created.ok).toBe(true);
     expect((await postClose(h, code)).body).toEqual({ ok: true });
     expect((await getState(h, code)).status).toBe(404);
+  });
+
+  it('close tardio com htok em sala sem dono preserva (não remove legado)', async () => {
+    const s = await h.connect();
+    const code = 'LGTAR2';
+    expect(await lobby(s, { type: 'create_room', nickname: 'Ana', roomCode: code })).toMatchObject({ ok: true });
+    // Close afiliado atrasado (outra partida, mesmo código): 403, sala intacta.
+    expect((await postClose(h, code, 'htok-antigo-xyz')).status).toBe(403);
+    expect((await postClose(h, code, 'htok-antigo-xyz')).body).toEqual({ ok: false, error: 'FORBIDDEN' });
+    expect((await getState(h, code)).status).toBe(200);
+    // Fechamento legítimo sem htok segue funcionando.
+    expect((await postClose(h, code)).status).toBe(200);
+    expect((await getState(h, code)).status).toBe(404);
+  });
+
+  it('histórico no banco bloqueia create solicitado (CODE_TAKEN) e outro código livre cria — Hub tenta outro sem travar', async () => {
+    // Servidor real + banco real (engine fake só para lógica de jogo, não usada aqui).
+    // Injeta resíduo histórico com dados (como v1 closed=1) direto no banco real.
+    const histCode = 'HSTAA2';
+    const freeCode = 'HSTBB3';
+    tx(h.app.ctx.db, () => {
+      insertRoom(h.app.ctx.db, { code: histCode, name: 'antiga', hostPlayerId: 'p-old', phase: 'lobby', version: 0, boardSeed: 's', createdAt: 1 });
+      insertMember(h.app.ctx.db, {
+        roomCode: histCode,
+        playerId: 'p-old',
+        name: 'Zed',
+        color: 'blue',
+        recoveryHash: 'hash-hist-1',
+        isHost: true,
+        ready: false,
+        joinedAt: 1,
+      });
+      insertChatRow(h.app.ctx.db, { id: 'hist-c1', roomCode: histCode, playerId: 'p-old', name: 'Zed', color: 'blue', text: 'adeus', at: 1 });
+      persistRoomUpdate(h.app.ctx.db, { roomCode: histCode, closed: true, updatedAt: 2 });
+    });
+    // Pedido explícito no código com histórico => CODE_TAKEN rápido (com ack, sem hang).
+    const s1 = await h.connect();
+    const clash = await lobby(s1, { type: 'create_room', nickname: 'Bia', roomCode: histCode, hubToken: 'dono-novo-1' });
+    expect(clash.ok).toBe(false);
+    if (!clash.ok) expect(clash.error.code).toBe('CODE_TAKEN');
+    // Histórico preservado automaticamente (membros/chat intactos).
+    const db = h.app.ctx.db;
+    expect((db.prepare('SELECT COUNT(*) AS n FROM members WHERE room_code = ?').get(histCode) as { n: number }).n).toBe(1);
+    expect((db.prepare('SELECT COUNT(*) AS n FROM chat WHERE room_code = ?').get(histCode) as { n: number }).n).toBe(1);
+    // Hub tenta outro código livre => cria sem CODE_TAKEN (fluxo recuperável).
+    const s2 = await h.connect();
+    const ok = await lobby(s2, { type: 'create_room', nickname: 'Bia', roomCode: freeCode, hubToken: 'dono-novo-1' });
+    expect(ok.ok).toBe(true);
+    expect((await getState(h, freeCode)).status).toBe(200);
+  });
+
+  it('falha injetada no create desfaz transação (sem sala parcial, rollback)', () => {
+    // Banco temporário real (:memory:): segunda inserção viola PK e desfaz a primeira.
+    const db = openDb(':memory:');
+    try {
+      const now = Date.now();
+      insertRoom(db, { code: 'RB001', name: 'base', hostPlayerId: 'p-base', phase: 'lobby', version: 0, boardSeed: 's', createdAt: now });
+      db.prepare(
+        'INSERT INTO members (room_code, player_id, name, color, recovery_hash, is_host, ready, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      ).run('RB001', 'p-base', 'Ana', 'red', 'hash-rb-base', 1, 0, now);
+      // Tenta criar RB002 mas o membro usa recovery_hash duplicado => falha e rollback.
+      expect(() =>
+        tx(db, () => {
+          insertRoom(db, { code: 'RB002', name: 'nova', hostPlayerId: 'p-new', phase: 'lobby', version: 0, boardSeed: 's', createdAt: now + 1 });
+          insertMember(db, {
+            roomCode: 'RB002',
+            playerId: 'p-new',
+            name: 'Bia',
+            color: 'blue',
+            recoveryHash: 'hash-rb-base',
+            isHost: true,
+            ready: false,
+            joinedAt: now + 1,
+          });
+        }),
+      ).toThrow();
+      // Rollback: RB002 não existe (nem sala nem membro parcial); base intacta.
+      expect(roomCodeExists(db, 'RB002')).toBe(false);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM members WHERE room_code = ?').get('RB002') as { n: number }).n).toBe(0);
+      expect(roomCodeExists(db, 'RB001')).toBe(true);
+      expect((db.prepare('SELECT COUNT(*) AS n FROM members WHERE room_code = ?').get('RB001') as { n: number }).n).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('erro não-conflito com código explícito → INTERNAL (não CODE_TAKEN), sem sala parcial', async () => {
+    // Falha injetada real (servidor real + banco real temp): sem tabela members,
+    // insertMember falha com "no such table" (não-conflito) dentro da tx do create.
+    h.app.ctx.db.exec('DROP TABLE members');
+    const s = await h.connect();
+    const res = await lobby(s, { type: 'create_room', nickname: 'Ana', roomCode: 'ERR99X' });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.code).toBe('INTERNAL');
+    // Sem sala parcial: nem memória nem banco (tx desfez o insertRoom) e sem hang.
+    expect(h.app.ctx.store.getOpenRoom('ERR99X')).toBeUndefined();
+    expect(roomCodeExists(h.app.ctx.db, 'ERR99X')).toBe(false);
+    expect((await getState(h, 'ERR99X')).status).toBe(404);
   });
 });

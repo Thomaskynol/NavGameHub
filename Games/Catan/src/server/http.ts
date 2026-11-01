@@ -110,7 +110,8 @@ function attachHubRoutes(app: Express, ctx: AppContext): void {
     if (!guard(req, res)) return;
     // htok: dono da instância (query ?htok=). Com dono, só fecha se conferir;
     // divergente/ausente => 403 FORBIDDEN e a sala segue intacta. Sem dono
-    // (legado), fecha livremente. Inexistente => 200 idempotente.
+    // (legado): só fecha sem htok; COM htok => 403 preserva (tardio de outra
+    // partida). Inexistente => 200 idempotente (nada a fazer).
     const htok = typeof req.query.htok === 'string' ? req.query.htok : undefined;
     const result = closeHubRoom(ctx, roomParam(req), htok);
     if (!result.ok) {

@@ -307,19 +307,78 @@ async function handleLobby(ctx: AppContext, socket: AppSocket, raw: unknown, ack
         updatedAt: now,
         test: { forceDice: null, rngSeed: null, rng: null },
       };
-      tx(ctx.db, () => {
-        insertRoom(ctx.db, { code, name: room.name, hostPlayerId: playerId, phase: 'lobby', version: 0, boardSeed: '', createdAt: now, hubToken });
-        insertMember(ctx.db, {
-          roomCode: code,
-          playerId,
-          name: member.name,
-          color: member.color,
-          recoveryHash: member.recoveryHash,
-          isHost: true,
-          ready: false,
-          joinedAt: now,
+      const isRequested = !!requested;
+      try {
+        tx(ctx.db, () => {
+          insertRoom(ctx.db, { code, name: room.name, hostPlayerId: playerId, phase: 'lobby', version: 0, boardSeed: '', createdAt: now, hubToken });
+          insertMember(ctx.db, {
+            roomCode: code,
+            playerId,
+            name: member.name,
+            color: member.color,
+            recoveryHash: member.recoveryHash,
+            isHost: true,
+            ready: false,
+            joinedAt: now,
+          });
         });
-      });
+      } catch (err) {
+        // Conflito (PK rooms.code: aberta ou histórico preservado) => CODE_TAKEN
+        // para o Hub tentar outro; nunca gera outro em silêncio e nunca trava
+        // sem ack. Erro não-conflito => INTERNAL com log, mesmo com código
+        // explícito (CODE_TAKEN é só para conflito real).
+        const msg = err instanceof Error ? err.message : String(err);
+        const conflict = msg.includes('UNIQUE constraint failed') || msg.includes('PRIMARY KEY');
+        if (conflict) {
+          // Pedido explícito com histórico => CODE_TAKEN honesto (preserva dados).
+          // Auto com conflito inesperado => tenta outro código uma vez antes de falhar.
+          if (!isRequested) {
+            const retry = generateRoomCode();
+            if (!ctx.store.rooms.has(retry) && !roomCodeExists(ctx.db, retry)) {
+              try {
+                tx(ctx.db, () => {
+                  insertRoom(ctx.db, {
+                    code: retry,
+                    name: room.name,
+                    hostPlayerId: playerId,
+                    phase: 'lobby',
+                    version: 0,
+                    boardSeed: '',
+                    createdAt: now,
+                    hubToken,
+                  });
+                  insertMember(ctx.db, {
+                    roomCode: retry,
+                    playerId,
+                    name: member.name,
+                    color: member.color,
+                    recoveryHash: member.recoveryHash,
+                    isHost: true,
+                    ready: false,
+                    joinedAt: now,
+                  });
+                });
+                room.code = retry;
+                code = retry;
+                ctx.store.rooms.set(code, room);
+                ctx.store.indexMember(room, member);
+                bindSocket(ctx, socket, code, playerId);
+                logInfo('room_created', { roomCode: code, players: 1 });
+                broadcastRoom(ctx, room);
+                ack({ ok: true, session: sessionPayload(room, member, recoveryCode), view: null });
+                return;
+              } catch {
+                /* retry falhou; cai no erro claro abaixo */
+              }
+            }
+          }
+          ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.CODE_TAKEN, 'Código de sala já está em uso.') });
+          return;
+        }
+        logError('room_create_failed', { roomCode: code, message: msg });
+        ack({ ok: false, requestId: env.requestId, error: engineError(ERROR_CODES.INTERNAL, 'Falha ao criar a sala.') });
+        return;
+      }
       ctx.store.rooms.set(code, room);
       ctx.store.indexMember(room, member);
       bindSocket(ctx, socket, code, playerId);
@@ -755,16 +814,19 @@ function runHook(ctx: AppContext, room: Room, hook: HookCommand): CommandRespons
  * Com dono (hubToken não vazio): só fecha se o htok conferir; divergente ou
  * ausente => { forbidden: true } (HTTP 403 FORBIDDEN, sala intacta). Fechamento
  * tardio de uma partida antiga nunca atinge a partida nova que reutilizou o
- * código. Sem dono (legado, hubToken ''): fecha livremente. Sala inexistente
- * => ok (nada a fazer). */
+ * código. Sem dono (legado, hubToken ''): só fecha sem htok (legítimo ao jogo);
+ * COM htok => 403 e preserva (close afiliado atrasado de outra partida).
+ * Sala inexistente => ok (nada a fazer, 200 idempotente). */
 export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknown): { ok: true } | { ok: false; error: 'FORBIDDEN' } {
   const code = String(rawCode ?? '').toUpperCase().trim();
   const room = ctx.store.rooms.get(code);
   if (!room) return { ok: true };
-  // shortcut: sala com dono exige o token da instância; sem ele/diferente não fecha.
+  // shortcut: dono confere por igualdade; sem dono, htok presente é de outra partida.
+  const provided = typeof rawToken === 'string' ? rawToken.trim() : '';
   if (room.hubToken !== '') {
-    const provided = typeof rawToken === 'string' ? rawToken.trim() : '';
     if (provided !== room.hubToken) return { ok: false, error: 'FORBIDDEN' };
+  } else if (provided !== '') {
+    return { ok: false, error: 'FORBIDDEN' };
   }
   tx(ctx.db, () => {
     for (const member of room.members.values()) {

@@ -32,19 +32,24 @@ Banco: SQLite via `node:sqlite` (módulo nativo do Node ≥ 22.13), caminho em `
 - Restaurar: substituir o arquivo e reiniciar (`npm start`).
 - Leitura de arquivo com versão desconhecida (`user_version` maior que o código) → o servidor **não apaga** nada: aborta com mensagem clara no log. Arquivo corrompido → aborta com instrução de restaurar backup (nunca recria silenciosamente).
 
-## Limpeza
+## Limpeza e preservação
 
 - Sala encerrada (`POST /__hub/close` autorizado ou último `leave_room`) é
   **removida por completo** (sala + membros + chat + `processed_commands`) e o
-  código fica livre para reutilização segura (com identidade `hub_token`).
+  código fica livre — reutilização posterior não encontra histórico para
+  apagar. Close com identidade: com dono exige `htok` igual; sem dono só fecha
+  sem `htok` (COM `htok` => 403 preserva, mesmo contrato VAVA).
+- Histórico nunca é sobrescrito no create: qualquer linha com o código
+  (aberta ou `closed = 1` com chat/membros) bloqueia (`roomCodeExists` = existe
+  linha; `insertRoom` nunca apaga, PK preserva). Colisão em pedido explícito
+  => `CODE_TAKEN` para o Hub tentar outro código; nunca gera outro em silêncio
+  e nunca trava sem ack. Limpeza de histórico, se necessária, exige backup
+  prévio e decisão registrada — nunca DELETE implícito.
 - Migração v1 → v2: **só-aditiva e atômica** — adiciona `rooms.hub_token`
   (`''` = sem dono/legado) e avança `user_version`/`meta.format` na mesma
   transação; **nada é apagado**. Salas `closed = 1` herdadas de v1 permanecem
-  no arquivo mas nunca bloqueiam código novo (`roomCodeExists` considera só
-  `closed = 0`; `insertRoom` descarta o resíduo `closed = 1` na transação do
-  create). Falha no meio desfaz tudo (DDL transacional) e a reabertura é limpa;
-  resíduo de ALTER sem versionar (migração antiga) é absorvido pela guarda de
-  coluna. Detalhes e alternativas em `src/server/db.ts`.
-- Sala fechada nunca bloqueia código novo: `roomCodeExists` considera só
-  `closed = 0`, e `insertRoom` descarta resíduo `closed = 1` na mesma transação.
+  no arquivo e bloqueiam reuse do código (preservação); o Hub recebe
+  `CODE_TAKEN` e tenta outro. Falha no meio desfaz tudo (DDL transacional) e
+  a reabertura é limpa; resíduo de ALTER sem versionar (migração antiga) é
+  absorvido pela guarda de coluna. Detalhes e alternativas em `src/server/db.ts`.
 - Nunca apagar sala por erro de leitura.

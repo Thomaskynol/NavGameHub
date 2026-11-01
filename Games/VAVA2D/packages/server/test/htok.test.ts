@@ -43,6 +43,12 @@ test('dono: close só fecha com o htok certo; legada fecha sem token', () => {
 
   rooms.createWithCode('CD34');
   assert.equal(rooms.close('CD34'), true, 'legada fecha sem token');
+  rooms.createWithCode('EF56');
+  assert.equal(rooms.close('EF56', 'tok-antigo-outra-partida'), false, 'htok em sala sem dono → preserva');
+  assert.ok(rooms.get('EF56'), 'sala sem dono segue intacta após htok alheio');
+  assert.equal(rooms.close('EF56', ''), true, 'htok vazio = ausente, fecha');
+  rooms.createWithCode('GH78');
+  assert.equal(rooms.close('GH78', null), true, 'legada fecha com null');
 });
 
 // ---------------------------------------------------------------------------
@@ -102,6 +108,42 @@ test('state inclui hubOwner (token ou null); close estrito com 403', () => {
   const legacyClose = fakeCall(handler, 'POST', '/__hub/close?room=CD34', headers);
   assert.equal(legacyClose.status, 200);
   assert.equal(fakeCall(handler, 'GET', '/__hub/state?room=CD34', headers).status, 404);
+});
+
+test('close: htok em sala sem dono → 403 e preserva; sem htok fecha', () => {
+  const rooms = new RoomManager();
+  rooms.createWithCode('EF56');
+  const handler = createRequestHandler({ rooms, secret: SECRET, hubTestHooks: false });
+  const headers = { 'x-hub-secret': SECRET };
+
+  const stale = fakeCall(handler, 'POST', '/__hub/close?room=EF56&htok=tok-antigo-outra-partida', headers);
+  assert.equal(stale.status, 403);
+  assert.ok(rooms.get('EF56'), 'sala sem dono segue intacta após close afiliado atrasado');
+
+  const other = fakeCall(handler, 'POST', '/__hub/close?room=EF56&htok=tok-qualquer', headers);
+  assert.equal(other.status, 403);
+  assert.ok(rooms.get('EF56'), 'qualquer htok em sala sem dono preserva');
+
+  const legit = fakeCall(handler, 'POST', '/__hub/close?room=EF56', headers);
+  assert.equal(legit.status, 200);
+  assert.deepEqual(JSON.parse(legit.body), { ok: true, closed: true });
+  assert.equal(rooms.get('EF56'), undefined);
+});
+
+test('close: código reutilizado por outra partida não fecha sala alheia', () => {
+  const rooms = new RoomManager();
+  rooms.createWithCode('AB23', 'tok-partida-nova');
+  const handler = createRequestHandler({ rooms, secret: SECRET, hubTestHooks: false });
+  const headers = { 'x-hub-secret': SECRET };
+
+  const stale = fakeCall(handler, 'POST', '/__hub/close?room=AB23&htok=tok-partida-antiga', headers);
+  assert.equal(stale.status, 403, 'htok da partida antiga não fecha a nova');
+  assert.ok(rooms.get('AB23'), 'sala da partida nova intacta');
+  assert.equal(rooms.get('AB23')?.hubOwner, 'tok-partida-nova');
+
+  const ok = fakeCall(handler, 'POST', '/__hub/close?room=AB23&htok=tok-partida-nova', headers);
+  assert.equal(ok.status, 200);
+  assert.deepEqual(JSON.parse(ok.body), { ok: true, closed: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -284,4 +326,70 @@ test('servidor real: join mesmo htok entra; divergente/sem-dono recusa sem entra
   assert.equal(state.status, 200);
   assert.equal(state.room?.players, 2, 'recusa não entrou; legado entrou');
   assert.equal(state.room?.hubOwner, null);
+});
+
+test('servidor real: close atrasado com htok alheio não derruba sala (a–g)', async (t) => {
+  const port = await startServer(t);
+  const sockets: WebSocket[] = [];
+  t.after(() => {
+    for (const ws of sockets) {
+      try {
+        ws.terminate();
+      } catch {
+        // já encerrado
+      }
+    }
+  });
+  const headers = { 'x-hub-secret': REAL_SECRET };
+  async function hubClose(code: string, htok?: string): Promise<{ status: number; body: string }> {
+    const qs = htok === undefined ? `room=${code}` : `room=${code}&htok=${encodeURIComponent(htok)}`;
+    const response = await fetch(`http://127.0.0.1:${port}/__hub/close?${qs}`, {
+      method: 'POST',
+      headers,
+    });
+    return { status: response.status, body: await response.text() };
+  }
+
+  // (d) sala independente sem dono + close com htok antigo → 403 + preserva.
+  const w1 = await openSocket(port);
+  sockets.push(w1);
+  await sendOnce(w1, { t: 'create', code: 'EF56', name: 'Solo' });
+  let res = await hubClose('EF56', 'tok-antigo-outra-partida');
+  assert.equal(res.status, 403, '(d) htok em sala sem dono → 403');
+  let state = await hubState(port, 'EF56');
+  assert.equal(state.status, 200, '(d) sala sem dono preservada');
+  assert.equal(state.room?.hubOwner, null);
+
+  // (e) sala independente sem htok fecha (legítimo).
+  res = await hubClose('EF56');
+  assert.equal(res.status, 200, '(e) sem htok fecha sala sem dono');
+  state = await hubState(port, 'EF56');
+  assert.equal(state.status, 404, '(e) sala fechada some do state');
+
+  // (a–c,f) sala com dono: sem/diferente → 403 + preserva; dono fecha.
+  const w2 = await openSocket(port);
+  sockets.push(w2);
+  await sendOnce(w2, { t: 'create', code: 'AB23', name: 'Alice', htok: 'tok-partida-nova' });
+
+  res = await hubClose('AB23');
+  assert.equal(res.status, 403, '(c) sem htok em sala com dono → 403');
+  res = await hubClose('AB23', 'tok-partida-antiga');
+  assert.equal(res.status, 403, '(b,f) htok antigo/divergente → 403');
+  state = await hubState(port, 'AB23');
+  assert.equal(state.status, 200, 'sala com dono intacta após recusas');
+  assert.equal(state.room?.hubOwner, 'tok-partida-nova');
+
+  res = await hubClose('AB23', 'tok-partida-nova');
+  assert.equal(res.status, 200, '(a) dono fecha');
+  state = await hubState(port, 'AB23');
+  assert.equal(state.status, 404, 'sala do dono fechada');
+
+  // (g) segredo errado → 403; state de sala inexistente → 404.
+  const bad = await fetch(`http://127.0.0.1:${port}/__hub/close?room=AB23`, {
+    method: 'POST',
+    headers: { 'x-hub-secret': 'errado' },
+  });
+  assert.equal(bad.status, 403, '(g) segredo errado → 403');
+  state = await hubState(port, 'ZZ99');
+  assert.equal(state.status, 404, '(g) state inexistente → 404');
 });

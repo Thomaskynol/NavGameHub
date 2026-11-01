@@ -74,13 +74,13 @@ function migrate(db: DatabaseSync): void {
     // - rooms com closed=1 + seus members/chat/processed_commands. Eram códigos
     //   históricos fechados que bloqueavam reutilização para sempre (404 no
     //   state + CODE_TAKEN no create). Mas a remoção NÃO é necessária para o
-    //   funcionamento: roomCodeExists filtra closed=0 e insertRoom descarta o
-    //   resíduo closed=1 na mesma transação do create (reutilização segura com
-    //   identidade hub_token). Apagar dados do usuário na migração é
+    //   funcionamento: roomCodeExists bloqueia qualquer código com histórico e
+    //   insertRoom nunca sobrescreve (PK preserva chat/membros); o Hub recebe
+    //   CODE_TAKEN e tenta outro código. Apagar dados do usuário na migração é
     //   irreversível; o padrão é não apagar nada. Alternativa se o banco
-    //   crescer: limpeza explícita via POST /__hub/close ou leave_room do
-    //   último membro (remove por completo), com backup prévio do arquivo
-    //   (docs/persistence.md) — nunca DELETE implícito no boot.
+    //   crescer: limpeza explícita com backup prévio do arquivo
+    //   (docs/persistence.md) e decisão registrada — nunca DELETE implícito
+    //   no boot nem no create.
     //
     // Atomicidade: SQLite DDL é transacional; ALTER + versão no mesmo
     // BEGIN/COMMIT => falha no meio desfaz tudo e a reabertura encontra v1
@@ -207,19 +207,19 @@ export function insertRoom(
   db: DatabaseSync,
   r: { code: string; name: string; hostPlayerId: string; phase: string; version: number; boardSeed: string; createdAt: number; hubToken?: string },
 ): void {
-  // Reutilização segura: um registro fechado residual (v1) com o mesmo código
-  // é descartado aqui, dentro da transação do chamador. Sala aberta nunca é
-  // tocada: se existir, o INSERT abaixo viola a PK e desfaz a transação.
-  const stale = db.prepare('SELECT 1 AS x FROM rooms WHERE code = ? AND closed = 1').get(r.code) !== undefined;
-  if (stale) deleteRoomData(db, r.code);
+  // Preservação: nunca apaga histórico. Se já existe linha com o código
+  // (aberta ou fechada com chat/membros), o INSERT viola a PK e a transação
+  // do chamador desfaz tudo — o chamador responde CODE_TAKEN e o Hub tenta
+  // outro código. Apagar chat/membros na reutilização é irreversível.
   db.prepare(
     'INSERT INTO rooms (code, name, host_player_id, state_json, phase, version, board_seed, created_at, updated_at, closed, hub_token) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, 0, ?)',
   ).run(r.code, r.name, r.hostPlayerId, r.phase, r.version, r.boardSeed, r.createdAt, r.createdAt, r.hubToken ?? '');
 }
 
-/** Só sala aberta bloqueia o código; fechada foi removida e é reutilizável. */
+/** Qualquer registro com o código bloqueia reuse (aberto ou fechado com histórico).
+ *  Preservação: código com chat/membros nunca é sobrescrito; Hub tenta outro. */
 export function roomCodeExists(db: DatabaseSync, code: string): boolean {
-  return db.prepare('SELECT 1 AS x FROM rooms WHERE code = ? AND closed = 0').get(code) !== undefined;
+  return db.prepare('SELECT 1 AS x FROM rooms WHERE code = ?').get(code) !== undefined;
 }
 
 /** Remove sala + membros + chat + idempotência (encerramento; libera o código). */

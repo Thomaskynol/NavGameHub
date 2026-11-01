@@ -82,9 +82,9 @@ test('R2: lançamentos simultâneos com mesmo candidato ficam isolados', async (
   assert.ok(htokB && htokB.length >= 16);
   assert.notStrictEqual(htokA, htokB);
 
-  // Duas salas reais isoladas após o fix.
-  arcade.createRoom(gameCodeA, { phase: 'lobby', players: 2, capacity: 2, joinable: false });
-  arcade.createRoom(gameCodeB, { phase: 'lobby', players: 2, capacity: 2, joinable: false });
+  // Duas salas reais isoladas após o fix (jogos conformes informam hubOwner).
+  arcade.createRoom(gameCodeA, { phase: 'lobby', players: 2, capacity: 2, joinable: false, hubOwner: htokA });
+  arcade.createRoom(gameCodeB, { phase: 'lobby', players: 2, capacity: 2, joinable: false, hubOwner: htokB });
   await waitForPlay(first.b, 0);
   await waitForPlay(second.b, 0);
   await waitForRoom(first.a, 'playing');

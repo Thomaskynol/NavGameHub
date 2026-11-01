@@ -53,7 +53,8 @@ async function launchPlaying(t, timings = {}) {
   b.send({ t: 'set_ready', ready: true });
   const play = await waitForPlay(a, 1);
   const gameCode = new URL(play.url).searchParams.get('room');
-  fake.createRoom(gameCode, { phase: 'playing', players: 2, capacity: 2, joinable: false });
+  const htok = new URL(play.url).searchParams.get('htok');
+  fake.createRoom(gameCode, { phase: 'playing', players: 2, capacity: 2, joinable: false, hubOwner: htok });
   await waitForPlay(b, 0);
   await waitForRoom(a, 'playing');
   return { hub, port, fake, clients, a, b, gameCode };

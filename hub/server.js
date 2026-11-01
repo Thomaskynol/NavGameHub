@@ -1037,12 +1037,13 @@ export function createHub(options = {}) {
     if (room.match) room.match.failed = (room.match.conflicts || 0) > 0 ? 'conflict' : true;
   }
 
-  // Dono da partida (contrato htok): o jogo informa `hubOwner` no state.
-  // Chave ausente = jogo legado (aceita provisoriamente); chave presente
-  // (mesmo null) precisa ser igual ao htok do launch, senão é CONFLITO.
+  // Dono da partida (contrato htok): o jogo informa `hubOwner` no state
+  // (string = htok do launch que criou a sala; null = sala sem dono).
+  // Campo ausente ou não-string = resposta incompatível: NÃO aceitar como
+  // própria (CONFLITO/ausência) — nunca enviar jogadores para lá.
   function ownsRoomState(state, htok) {
     if (!state || state.kind !== 'exists' || !state.room) return false;
-    if (state.room.hubOwner === undefined) return true;
+    if (typeof state.room.hubOwner !== 'string') return false;
     return state.room.hubOwner === htok;
   }
 

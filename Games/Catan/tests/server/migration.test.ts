@@ -154,9 +154,9 @@ describe('migração v1→v2: só-aditiva e atômica', () => {
         { code: 'OPEN1', hub_token: '' },
         { code: 'SHUT1', hub_token: '' },
       ]);
-      // Códigos: aberta bloqueia, fechada não (liberada com identidade).
+      // Códigos: aberta bloqueia; fechada com histórico também bloqueia (preservação, Hub tenta outro).
       expect(roomCodeExists(db, 'OPEN1')).toBe(true);
-      expect(roomCodeExists(db, 'SHUT1')).toBe(false);
+      expect(roomCodeExists(db, 'SHUT1')).toBe(true); // histórico preservado: bloqueia reuse
       expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(SCHEMA_VERSION);
     } finally {
       db.close();
@@ -174,19 +174,26 @@ describe('migração v1→v2: só-aditiva e atômica', () => {
     expect(userVersion(path)).toBe(2);
   });
 
-  it('código fechado reutilizável após migração (identidade do novo dono)', () => {
+  it('código com histórico fechado NÃO é reutilizável: bloqueia e preserva dados', () => {
     const path = tmpFile();
     buildV1(path);
     const db = openDb(path);
     try {
+      // Histórico bloqueia: Hub deve tentar outro código (CODE_TAKEN), nunca sobrescrever.
+      expect(roomCodeExists(db, 'SHUT1')).toBe(true);
       expect(() =>
         insertRoom(db, { code: 'SHUT1', name: 'nova', hostPlayerId: 'p-new', phase: 'lobby', version: 0, boardSeed: 's', createdAt: 3, hubToken: 'dono-novo' }),
-      ).not.toThrow();
-      expect(roomCodeExists(db, 'SHUT1')).toBe(true);
-      const row = db.prepare('SELECT hub_token AS h FROM rooms WHERE code = ?').get('SHUT1') as { h: string };
-      expect(row.h).toBe('dono-novo');
-      // Membros/chat da sala fechada antiga saíram com a reutilização; aberta intacta.
+      ).toThrow();
+      // Nada apagado: sala antiga segue com dono vazio, membros, chat e idempotência.
+      const row = db.prepare('SELECT hub_token AS h, closed AS c FROM rooms WHERE code = ?').get('SHUT1') as { h: string; c: number };
+      expect(row.h).toBe('');
+      expect(row.c).toBe(1);
+      expect(count(db, 'SELECT COUNT(*) AS n FROM members WHERE room_code = ?', 'SHUT1')).toBe(1);
+      expect(count(db, 'SELECT COUNT(*) AS n FROM chat WHERE room_code = ?', 'SHUT1')).toBe(1);
+      expect(count(db, 'SELECT COUNT(*) AS n FROM processed_commands WHERE room_code = ?', 'SHUT1')).toBe(1);
+      // Aberta intacta.
       expect(count(db, 'SELECT COUNT(*) AS n FROM members WHERE room_code = ?', 'OPEN1')).toBe(1);
+      expect(roomCodeExists(db, 'OPEN1')).toBe(true);
     } finally {
       db.close();
     }

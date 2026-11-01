@@ -13,7 +13,9 @@
     "build": "npm run build --workspace @vava/client",
     "start": "npm run start --workspace @vava/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspace @vava/shared"
+    "test": "npm run test:shared && npm run test:server",
+    "test:shared": "npm run test --workspace @vava/shared",
+    "test:server": "npm run test --workspace @vava/server"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

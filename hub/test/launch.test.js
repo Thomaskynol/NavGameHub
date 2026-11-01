@@ -65,6 +65,7 @@ async function startMatch({ fakes, clients, port, gameId, capacity, codeLength, 
     players: 2,
     capacity,
     joinable: gameId === 'vava',
+    hubOwner: urlA.searchParams.get('htok'),
   });
   const playB = await waitForPlay(b, 0);
   await waitForRoom(a, 'playing');
@@ -295,6 +296,7 @@ test('isolamento: duas salas simultâneas no mesmo jogo têm gameCodes distintos
       players: 2,
       capacity: 6,
       joinable: false,
+      hubOwner: new URL(playA.url).searchParams.get('htok'),
     });
     await waitForPlay(b, 0);
     await waitForRoom(a, 'playing');

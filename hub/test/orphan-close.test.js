@@ -49,7 +49,7 @@ async function launchMatch({ port, fake, clients, nickA = 'Alice', nickB = 'Bob'
   const play = await waitForPlay(a, 1);
   const url = new URL(play.url);
   const gameCode = url.searchParams.get('room');
-  fake.createRoom(gameCode, { phase: 'lobby', players: 2, capacity: 2, joinable: false });
+  fake.createRoom(gameCode, { phase: 'lobby', players: 2, capacity: 2, joinable: false, hubOwner: url.searchParams.get('htok') });
   await waitForPlay(b, 0);
   await waitForRoom(a, 'playing');
   return { a, b, gameCode, htok: url.searchParams.get('htok') };
@@ -117,7 +117,7 @@ test('R3: partidas sucessivas fecham cada uma com seu htok', async (t) => {
   const htok2 = new URL(play.url).searchParams.get('htok');
   assert.notStrictEqual(gameCode2, first.gameCode);
   assert.notStrictEqual(htok2, first.htok);
-  fake.createRoom(gameCode2, { phase: 'lobby', players: 2, capacity: 2, joinable: false });
+  fake.createRoom(gameCode2, { phase: 'lobby', players: 2, capacity: 2, joinable: false, hubOwner: htok2 });
   await waitForPlay(first.b, 0);
   await waitForRoom(first.a, 'playing');
 

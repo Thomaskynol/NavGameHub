@@ -85,16 +85,24 @@ export function createRequestHandler(
       }
       // Fecha com identidade (R2): sala com dono (htok) só fecha com o mesmo
       // htok do launch (`?htok=`); sem ele/diferente → 403 e a sala intacta.
-      // Sala sem dono (manual/legada) mantém o comportamento anterior.
+      // Sala sem dono (manual/legada): sem htok mantém o comportamento
+      // anterior; COM htok → 403 (não misturar close afiliado atrasado de
+      // outra partida com sala independente).
       const target = rooms ? rooms.get(code) : undefined;
+      const qHtok = url.searchParams.get('htok');
       if (target && target.hubOwner) {
-        const htok = String(url.searchParams.get('htok') ?? '');
+        const htok = String(qHtok ?? '');
         if (htok !== target.hubOwner) {
           sendJson(res, 403, { ok: false, error: 'FORBIDDEN' });
           return;
         }
+      } else if (target && !target.hubOwner) {
+        if (qHtok != null && qHtok !== '') {
+          sendJson(res, 403, { ok: false, error: 'FORBIDDEN' });
+          return;
+        }
       }
-      const closed = rooms ? rooms.close(code, url.searchParams.get('htok')) : false;
+      const closed = rooms ? rooms.close(code, qHtok) : false;
       sendJson(res, 200, { ok: true, closed });
       return;
     }

@@ -115,7 +115,7 @@ describe('hub dono: state, join e close', () => {
     expect(bound.ok).toBe(true);
   });
 
-  it('close estrito: com dono exige htok (403 sem/errado); sem dono fecha livre', async () => {
+  it('close estrito: com dono exige htok (403 sem/errado); sem dono só sem htok, com htok 403 preserva', async () => {
     const s1 = await h.connect();
     await lobby(s1, { type: 'create_room', nickname: 'Ana', roomCode: 'CLS444', hubToken: 'dono-c1' });
 
@@ -135,7 +135,8 @@ describe('hub dono: state, join e close', () => {
     // Idempotente em sala inexistente.
     expect((await postClose(h, 'CLS444', 'dono-c1')).status).toBe(200);
 
-    // Legada sem dono: fecha sem htok (e com htok qualquer, livremente).
+    // Legada sem dono: fecha sem htok (legítimo ao jogo); COM htok → 403 preserva
+    // (close afiliado atrasado de outra partida que reutilizou o código).
     const s2 = await h.connect();
     await lobby(s2, { type: 'create_room', nickname: 'Bia', roomCode: 'CLS222' });
     expect((await postClose(h, 'CLS222')).status).toBe(200);
@@ -143,7 +144,13 @@ describe('hub dono: state, join e close', () => {
 
     const s3 = await h.connect();
     await lobby(s3, { type: 'create_room', nickname: 'Cid', roomCode: 'CLS333' });
-    expect((await postClose(h, 'CLS333', 'qualquer')).status).toBe(200);
+    const withTok = await postClose(h, 'CLS333', 'qualquer');
+    expect(withTok.status).toBe(403);
+    expect(withTok.body).toEqual({ ok: false, error: 'FORBIDDEN' });
+    expect((await getState(h, 'CLS333')).status).toBe(200);
+    // Sem htok fecha (legítimo); inexistente idempotente mesmo com htok.
+    expect((await postClose(h, 'CLS333')).status).toBe(200);
     expect((await getState(h, 'CLS333')).status).toBe(404);
+    expect((await postClose(h, 'CLS333', 'qualquer')).status).toBe(200);
   });
 });

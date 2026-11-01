@@ -44,9 +44,10 @@ test('R5: entrada no pregame recebe play; após o início, espera', async (t) =>
   const playA = await waitForPlay(a, 1);
   const gameCode = new URL(playA.url).searchParams.get('room');
 
-  // O jogo ainda está no lobby e aceita jogadores.
+  // O jogo ainda está no lobby e aceita jogadores (conforme: informa o dono).
   fake.createRoom(gameCode, {
     phase: 'lobby', players: 2, capacity: 6, joinable: true,
+    hubOwner: new URL(playA.url).searchParams.get('htok'),
   });
   await waitForPlay(b, 0);
   await waitForRoom(a, 'playing');
@@ -111,9 +112,10 @@ test('R5: jogo lotado mantém o recém-chegado em espera', async (t) => {
   await waitForRoom(a, 'launching');
   const playA = await waitForPlay(a, 1);
   const gameCode = new URL(playA.url).searchParams.get('room');
-  // Lobby, mas sem vaga no jogo.
+  // Lobby, mas sem vaga no jogo (conforme: informa o dono).
   fake.createRoom(gameCode, {
     phase: 'lobby', players: 6, capacity: 6, joinable: true,
+    hubOwner: new URL(playA.url).searchParams.get('htok'),
   });
   await waitForPlay(b, 0);
   await waitForRoom(a, 'playing');

@@ -43,11 +43,16 @@ export class RoomManager {
 
   /** Remove a sala do Hub e libera o código. Idempotente. Com dono (htok),
    *  só fecha se o htok conferir — protege reutilização do código por outra
-   *  partida. Sala sem dono fecha livremente (manual/legada). */
+   *  partida. Sem dono (manual/legada), só fecha sem htok (legítimo); com
+   *  htok (close afiliado atrasado de outra partida) → recusa e preserva. */
   close(code: string, htok?: string | null): boolean {
     const room = this.rooms.get(code.toUpperCase());
     if (!room) return false;
-    if (room.hubOwner && room.hubOwner !== (htok ?? null)) return false;
+    if (room.hubOwner) {
+      if (room.hubOwner !== (htok ?? null)) return false;
+      return this.rooms.delete(code.toUpperCase());
+    }
+    if (htok !== undefined && htok !== null && htok !== '') return false;
     return this.rooms.delete(code.toUpperCase());
   }
 
