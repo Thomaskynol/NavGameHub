@@ -27,6 +27,11 @@ export function missingCost(res: Record<ResourceKind, number>, cost: Partial<Rec
   return out;
 }
 
+/** Gate do modo estrada: só entra com custo pago ou estrada gratuita (carta). */
+export function canEnterRoadMode(res: Record<ResourceKind, number>, freeRoadsLeft: number): boolean {
+  return canAfford(res, COSTS.road) || freeRoadsLeft > 0;
+}
+
 export function CostIcons({ cost, showQty = true }: { cost: Partial<Record<ResourceKind, number>>; showQty?: boolean }) {
   return (
     <span className="cost-icons">

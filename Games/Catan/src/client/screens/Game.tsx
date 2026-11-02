@@ -7,7 +7,7 @@ import { playSfx } from '../audio';
 import Board, { type BoardMode, type BoardPick } from '../board/Board';
 import { getGeometry, legalBuildTargets, legalRobberHexes, robberVictims } from '../board/legalClient';
 import { parseHubParams } from '../session';
-import HandPanel from '../game/HandPanel';
+import HandPanel, { canEnterRoadMode } from '../game/HandPanel';
 import PlayersTop from '../game/PlayersTop';
 import ResultScreen from '../game/ResultScreen';
 import SideTabs from '../game/SideTabs';
@@ -121,7 +121,12 @@ export default function Game({ mock = false }: { mock?: boolean }) {
     if (view.phase === 'setup_road' && view.setupCurrentPlayerId === youId) {
       return { kind: 'edge', edges: legal.setupEdges, label: 'Coloque a estrada ao lado' };
     }
-    if (buildMode === 'road') return { kind: 'edge', edges: legal.roadEdges, label: 'Escolha a aresta da estrada' };
+    if (buildMode === 'road') {
+      // Gate de custo: sem 1 tijolo + 1 madeira (e sem estrada gratuita), não há placement nem destaques.
+      const free = view.pending?.type === 'road_building' ? view.pending.roadsLeft ?? 0 : 0;
+      if (!canEnterRoadMode(view.you.resources, free)) return { kind: 'none', label: '' };
+      return { kind: 'edge', edges: legal.roadEdges, label: 'Escolha a aresta da estrada' };
+    }
     if (buildMode === 'free_road') return { kind: 'edge', edges: legal.freeRoadEdges.length ? legal.freeRoadEdges : legal.roadEdges, label: 'Estrada gratuita' };
     if (buildMode === 'settlement') return { kind: 'vertex', vertices: legal.settlementVertices, label: 'Escolha o local do assentamento' };
     if (buildMode === 'city') return { kind: 'vertex', vertices: legal.cityVertices, label: 'Escolha a casa para promover a cidade' };
@@ -172,6 +177,11 @@ export default function Game({ mock = false }: { mock?: boolean }) {
   };
 
   const startBuild = (kind: 'road' | 'settlement' | 'city') => {
+    if (kind === 'road') {
+      // TurnBar desabilita o botão sem recurso; defesa em profundidade aqui.
+      const free = view.pending?.type === 'road_building' ? view.pending.roadsLeft ?? 0 : 0;
+      if (!canEnterRoadMode(view.you.resources, free)) return;
+    }
     setSelected(null);
     setBuildMode(kind);
     setDrawer(null);
