@@ -19,8 +19,9 @@ export const ROOM_SEED = 'e2e-seed-01';
 const PREFS_JSON = JSON.stringify({ volume: 0, muted: true, reduceMotion: true, tutorialSeen: true, nickname: '' });
 
 // Topologia MOTOR (fonte de verdade do servidor). A geometria do cliente
-// (src/client/board/geometry.ts) associa hexes a cantos espelhados (bug latente
-// documentado no retorno): usá-la para hex↔vértice erraria produção/vítimas.
+// (src/client/board/geometry.ts) associa cada canto aos mesmos tiles do motor
+// (motorCornerId sobre axialToCube(q, r) — regressão coberta em
+// tests/client/geometry.test.ts); usá-la para hex↔vértice é seguro.
 const boardCache = new Map<string, BoardLayout>();
 function motorBoard(view: GameView): BoardLayout {
   let b = boardCache.get(view.board.seed);

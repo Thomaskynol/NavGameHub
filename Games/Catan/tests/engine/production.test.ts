@@ -170,4 +170,45 @@ describe('produção (roll)', () => {
     expect(first.state.phase).toBe('action');
     expectErr(roll(first.state, 4), ERROR_CODES.WRONG_PHASE);
   });
+
+  it('aldeia adjacente a dois hexes 5: roll 5 da 2 recursos (banco cheio, sem ladrao)', () => {
+    let s = finishSetup(newGame(3, 's2'), makeRng('s2'));
+    s = resetBoard(s);
+    const fives = new Set(s.board.hexes.filter((h) => h.number === 5).map((h) => h.id));
+    expect(fives.size).toBe(2);
+    const entry = Object.entries(s.board.vertexHexes).find(([, hs]) => hs.filter((h) => fives.has(h)).length >= 2);
+    expect(entry).toBeDefined();
+    const [v, hs] = entry as [string, string[]];
+    addBuilding(s, 'p0', v, 'settlement');
+    const kinds = hs.filter((h) => fives.has(h)).map((h) => resourceOf(s, h));
+    expect(kinds.length).toBeGreaterThanOrEqual(2);
+    const before = { ...s.players.find((p) => p.id === 'p0')!.resources };
+    const r = roll(s, 5);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const after = r.state.players.find((p) => p.id === 'p0')!;
+    for (const k of kinds) {
+      const n = kinds.filter((x) => x === k).length;
+      expect(after.resources[k]).toBe(before[k] + n);
+    }
+    expect(r.state.dice).toEqual({ d1: 4, d2: 1 }); // roll(5): 4+1
+  });
+
+  it('aldeia adjacente a dois hexes 5 com ladrao em um deles: roll 5 da 1 recurso', () => {
+    let s = finishSetup(newGame(3, 's2'), makeRng('s2'));
+    s = resetBoard(s);
+    const fives = s.board.hexes.filter((h) => h.number === 5).map((h) => h.id);
+    expect(fives.length).toBe(2);
+    const entry = Object.entries(s.board.vertexHexes).find(([, hs]) => fives.every((f) => hs.includes(f)));
+    expect(entry).toBeDefined();
+    const [v] = entry as [string, string[]];
+    addBuilding(s, 'p0', v, 'settlement');
+    s.robberHexId = fives[0]; // bloqueia um dos dois hexes 5
+    const freeRes = resourceOf(s, fives[1]);
+    const before = s.players.find((p) => p.id === 'p0')!.resources[freeRes];
+    const r = roll(s, 5);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources[freeRes]).toBe(before + 1);
+  });
 });

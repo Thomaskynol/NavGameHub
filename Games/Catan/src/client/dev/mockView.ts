@@ -1,7 +1,7 @@
 // Camada mock (apenas DEV com VITE_MOCK=1): GameView completo + motorzinho local.
 // Em produção o import some (tree-shake por import.meta.env.DEV).
 import type { DevCardKind, HexId, PlayerColor, PlayerId, ResourceKind, VertexId, EdgeId } from '../../shared/constants';
-import { COSTS, NUMBER_TOKENS, TERRAIN_COUNTS } from '../../shared/constants';
+import { COSTS, NUMBER_TOKENS, TERRAIN_COUNTS, TERRAIN_RESOURCE } from '../../shared/constants';
 import type { PortSlot } from '../../shared/types';
 import type {
   BoardView,
@@ -12,7 +12,7 @@ import type {
   PublicPlayerView,
   YouView,
 } from '../../shared/protocol';
-import { buildIslandGeometry, edgeIdOf, ISLAND_AXIAL, hexId, vertexIdFromCorner, type IslandGeometry } from '../board/geometry';
+import { buildIslandGeometry, edgeIdOf, ISLAND_AXIAL, hexId, motorCornerId, axialToCube, type IslandGeometry } from '../board/geometry';
 
 function mulberry32(seed: number) {
   let a = seed >>> 0;
@@ -107,15 +107,17 @@ export function createMockView(): GameView {
   const roads: BoardView['roads'] = [];
   MOCK_PLAYERS.forEach((p, i) => {
     const h = pickHex(i);
-    const vA = geo.vertices.get(vertexIdFromCorner(h.q, h.r, 0))!;
-    const vB = geo.vertices.get(vertexIdFromCorner(h.q, h.r, 1))!;
+    const mc = axialToCube(h.q, h.r);
+    const vA = geo.vertices.get(motorCornerId(mc, 0))!;
+    const vB = geo.vertices.get(motorCornerId(mc, 1))!;
     buildings.push({ vertexId: vA.id, playerId: p.id, kind: i === 0 ? 'settlement' : i === 1 ? 'city' : 'settlement' });
     roads.push({ edgeId: edgeIdOf(vA.id, vB.id), playerId: p.id });
     const h2 = pickHex(i + 5);
-    const vC = geo.vertices.get(vertexIdFromCorner(h2.q, h2.r, 3))!;
+    const mc2 = axialToCube(h2.q, h2.r);
+    const vC = geo.vertices.get(motorCornerId(mc2, 3))!;
     if (!buildings.some((b) => b.vertexId === vC.id)) {
       buildings.push({ vertexId: vC.id, playerId: p.id, kind: 'settlement' });
-      const vD = geo.vertices.get(vertexIdFromCorner(h2.q, h2.r, 4))!;
+      const vD = geo.vertices.get(motorCornerId(mc2, 4))!;
       roads.push({ edgeId: edgeIdOf(vC.id, vD.id), playerId: p.id });
     }
   });
@@ -252,8 +254,31 @@ export function applyMockCommand(view: GameView, payload: { type: string } & Rec
       const d2 = 1 + Math.floor(Math.random() * 6);
       if (d1 + d2 === 7) d1 = 3; // mock evita 7 para simplificar
       const total = d1 + d2;
+      // Produção espelhando o motor (só o próprio jogador tem mão modelada no mock):
+      // hex com o número, sem ladrão, sem deserto; assentamento 1, cidade 2; teto do banco
+      // (beneficiário único recebe o que restar — mesma exceção do motor).
+      const geo = buildIslandGeometry(base.board.hexes);
+      const owed = new Map<ResourceKind, number>();
+      for (const b of base.board.buildings) {
+        if (b.playerId !== YOU) continue;
+        for (const hid of geo.vertices.get(b.vertexId)?.hexes ?? []) {
+          const t = base.board.hexes.find((h) => h.id === hid);
+          if (!t || t.number !== total || t.id === base.board.robberHexId || t.terrain === 'desert') continue;
+          const kind = TERRAIN_RESOURCE[t.terrain];
+          owed.set(kind, (owed.get(kind) ?? 0) + (b.kind === 'city' ? 2 : 1));
+        }
+      }
+      const res = { ...base.you.resources };
+      const bank = { ...base.bankCounts };
+      for (const [kind, n] of owed) {
+        const give = Math.min(n, bank[kind]);
+        bank[kind] -= give;
+        res[kind] += give;
+      }
       return {
         ...base,
+        you: { ...base.you, resources: res },
+        bankCounts: bank,
         dice: { d1, d2 },
         phase: 'action',
         history: pushHistory(base, 'dice', `Você rolou ${d1} + ${d2} = ${total}.`),
