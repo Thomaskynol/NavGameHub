@@ -198,7 +198,7 @@ export const CARD_INFO: Record<CardType, { title: string; description: string }>
   slowKnockback: { title: 'Balas Pesadas', description: 'Balas mais lentas, mas empurram inimigos ao acertar.' },
   wallBounce: { title: 'Quicada Letal', description: 'Bala bate 1 vez na parede e causa +50% de dano.' },
   chargedShot: { title: 'Tiro Carregado', description: 'Após 2s sem atirar, o próximo tiro causa +20% de dano e é 30% mais rápido.' },
-  dashInvis: { title: 'Dash Fantasma', description: 'Fica invisível por 3s ao dar dash.' },
+  dashInvis: { title: 'Dash Fantasma', description: 'Fica invisível por 1.5s ao dar dash.' },
 };
 
 export const CARD_TYPES: CardType[] = [

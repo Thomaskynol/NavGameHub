@@ -560,9 +560,10 @@ export class Room {
       if (player.physics.y < DUEL_ARENA.minY) { player.physics.y = DUEL_ARENA.minY; if (player.physics.vy < 0) player.physics.vy = 0; }
       if (player.physics.y > DUEL_ARENA.maxY) { player.physics.y = DUEL_ARENA.maxY; if (player.physics.vy > 0) player.physics.vy = 0; }
     }
-    // Dash Fantasma: invisível de verdade por 3s; dano/colisão não revelam antes.
+    // Dash Fantasma: invisível de verdade por 1.5s (menor que o cooldown do
+    // dash, sem invisibilidade emendada); dano/colisão não revelam antes.
     if (dashReady && player.physics.dashTime > 0 && player.cards.includes('dashInvis')) {
-      player.invisible = 3;
+      player.invisible = 1.5;
     }
     if (input.shoot && player.reloading <= 0 && player.ammo > 0) {
       player.shooting = true;
