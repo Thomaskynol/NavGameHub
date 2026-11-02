@@ -3,34 +3,38 @@ import {
   DUEL,
   DUEL_ARENA,
   INPUT_QUEUE_LIMIT,
+  MAP_VOTE,
   MATCH,
-  OBSTACLES,
-  PISTOL,
   GRENADE,
   WEAPONS,
   DROP,
   POWERUP,
   CARD_TYPES,
+  PISTOL,
   PLAYER,
   PLAYER_COLORS,
   SNAPSHOT_EVERY_TICKS,
-  SPAWN_POINTS,
   TICK_DT,
   createPlayerPhysics,
   distanceSq,
   explosionBlockedByWall,
+  obstaclesFor,
+  powerupPointsFor,
   segmentCircleHit,
   normalizeAngle,
   pointBlockedByObstacle,
+  spawnsFor,
   stepPlayerPhysics,
 } from '@vava/shared';
 import type {
   GameEvent,
+  MapId,
   NetBullet,
   NetGrenade,
   NetDrop,
   NetPowerup,
   NetPlayer,
+  Obstacle,
   Phase,
   PlayerInput,
   PlayerPhysics,
@@ -141,8 +145,13 @@ export class Room {
   phase: Phase = 'waiting';
   timeLeft: number = MATCH.durationSeconds;
   winnerId: string | null = null;
+  /** Mapa congelado da partida atual (votado em waiting, replicado no snapshot). */
+  mapId: MapId = 'field';
   tick = 0;
   emptySince: number | null = Date.now();
+  private voting = false;
+  private voteTimer = 0;
+  private readonly mapVotes = new Map<string, MapId>();
 
   private readonly players = new Map<string, ServerPlayer>();
   private bullets: Bullet[] = [];
@@ -165,7 +174,17 @@ export class Room {
 
   constructor(code: string) {
     this.code = code;
-    for (const point of POWERUP.spawnPoints) {
+    this.resetPowerupSpawns();
+  }
+
+  /** Obstáculos do mapa ativo (física segue o mapa votado). */
+  private activeObstacles(): readonly Obstacle[] {
+    return obstaclesFor(this.mapId);
+  }
+
+  private resetPowerupSpawns(): void {
+    this.powerupSpawns = [];
+    for (const point of powerupPointsFor(this.mapId)) {
       this.powerupSpawns.push({
         id: this.nextPowerupId++,
         x: point.x,
@@ -263,6 +282,7 @@ export class Room {
     if (!player) return;
 
     this.players.delete(playerId);
+    this.mapVotes.delete(playerId);
     this.bullets = this.bullets.filter((bullet) => bullet.owner !== playerId);
     this.grenades = this.grenades.filter((grenade) => grenade.owner !== playerId);
     // Duelo em andamento: sobrevivente volta à origem (vitória por W.O.).
@@ -296,6 +316,8 @@ export class Room {
       this.timeLeft = MATCH.durationSeconds;
       this.winnerId = null;
       this.started = false;
+      this.voting = false;
+      this.mapVotes.clear();
       this.bullets = [];
       this.grenades = [];
       this.drops = [];
@@ -303,14 +325,14 @@ export class Room {
       this.dropTimer = DROP.intervalSeconds;
       this.dropWarningSent = false;
       this.pendingDrops = [];
-      for (const spawn of this.powerupSpawns) {
-        spawn.active = true;
-        spawn.respawnTimer = 0;
-        spawn.type = this.randomPowerupType(false);
-      }
+      this.mapId = 'field';
+      this.resetPowerupSpawns();
     }
     if (this.players.size < 2 && this.phase === 'playing') {
       this.phase = 'waiting';
+    }
+    if (this.players.size < 2) {
+      this.voting = false;
     }
   }
 
@@ -371,12 +393,25 @@ export class Room {
     }
 
     if (this.phase === 'waiting') {
-      if (this.players.size >= 2) {
-        if (!this.started) {
-          this.beginMatch();
-        } else {
-          this.phase = 'playing';
+      if (this.players.size < 2) {
+        this.voting = false;
+        return;
+      }
+      if (!this.started) {
+        // Antes de cada partida: votação de mapa com timer; maioria vence,
+        // empate ou abstenção geral sorteia. Quem não votar é abstinência.
+        if (!this.voting) {
+          this.voting = true;
+          this.voteTimer = MAP_VOTE.durationSeconds;
+          this.mapVotes.clear();
+          return;
         }
+        this.voteTimer -= dt;
+        if (this.voteTimer > 0 && !this.allVoted()) return;
+        this.resolveMapVote();
+        this.beginMatch();
+      } else {
+        this.phase = 'playing';
       }
       return;
     }
@@ -399,7 +434,9 @@ export class Room {
     this.timeLeft = Math.max(0, this.timeLeft - dt);
     if (this.timeLeft <= 0) {
       if (this.players.size >= 2) {
-        this.beginMatch();
+        // Revanche vota o mapa de novo: volta a waiting sem started.
+        this.phase = 'waiting';
+        this.started = false;
       } else {
         this.phase = 'waiting';
         this.started = false;
@@ -407,6 +444,40 @@ export class Room {
         this.winnerId = null;
         this.bullets = [];
       }
+    }
+  }
+
+  /** Voto de mapa (só durante a votação em waiting); inválido é ignorado. */
+  handleVoteMap(playerId: string, map: string): void {
+    if (!this.voting || this.phase !== 'waiting') return;
+    if (map !== 'field' && map !== 'city') return;
+    if (!this.players.has(playerId)) return;
+    this.mapVotes.set(playerId, map);
+  }
+
+  private allVoted(): boolean {
+    return this.players.size >= 2 && this.mapVotes.size >= this.players.size;
+  }
+
+  private countVotes(): { field: number; city: number } {
+    let field = 0;
+    let city = 0;
+    for (const player of this.players.values()) {
+      const vote = this.mapVotes.get(player.id);
+      if (vote === 'city') city += 1;
+      else if (vote === 'field') field += 1;
+    }
+    return { field, city };
+  }
+
+  private resolveMapVote(): void {
+    const { field, city } = this.countVotes();
+    this.voting = false;
+    this.mapVotes.clear();
+    if (field === city) {
+      this.mapId = Math.random() < 0.5 ? 'field' : 'city';
+    } else {
+      this.mapId = city > field ? 'city' : 'field';
     }
   }
 
@@ -431,11 +502,7 @@ export class Room {
     this.pendingDrops = [];
     this.cardRoundTimer = 60;
     this.cardSelectionTimer = 0;
-    for (const spawn of this.powerupSpawns) {
-      spawn.active = true;
-      spawn.respawnTimer = 0;
-      spawn.type = this.randomPowerupType(false);
-    }
+    this.resetPowerupSpawns();
     this.phase = 'playing';
     this.timeLeft = MATCH.durationSeconds;
     this.winnerId = null;
@@ -479,10 +546,11 @@ export class Room {
   }
 
   private pickSpawn(playerId: string): { x: number; y: number } {
-    let best = SPAWN_POINTS[0] ?? { x: 150, y: 150 };
+    const spawns = spawnsFor(this.mapId);
+    let best = spawns[0] ?? { x: 150, y: 150 };
     let bestScore = -1;
 
-    for (const point of SPAWN_POINTS) {
+    for (const point of spawns) {
       let nearest = Number.POSITIVE_INFINITY;
       for (const other of this.players.values()) {
         if (other.id === playerId || !other.alive) continue;
@@ -550,7 +618,7 @@ export class Room {
     const input = queued ?? idleInput(player.physics.aim);
     const baseSpeed = WEAPONS[player.weapon].speed;
     const speed = baseSpeed * (player.speedBoost > 0 ? 1.5 : 1) * (player.giant > 0 ? 0.9 : 1);
-    const obstacles = player.inDuel ? [] : OBSTACLES;
+    const obstacles = player.inDuel ? [] : this.activeObstacles();
     const dashReady = player.physics.dashCooldown <= 0 && player.physics.dashTime <= 0;
     stepPlayerPhysics(player.physics, input, dt, obstacles, speed);
     if (player.inDuel) {
@@ -822,7 +890,7 @@ export class Room {
       const diff = Math.abs(normalizeAngle(targetAngle - angle));
       if (diff > 0.55) continue;
       // Parede da casa blinda como na granada; mato/pedra não blindam.
-      if (explosionBlockedByWall(originX, originY, target.physics.x, target.physics.y)) continue;
+      if (explosionBlockedByWall(originX, originY, target.physics.x, target.physics.y, this.activeObstacles())) continue;
 
       target.health = Math.max(0, target.health - damage);
 
@@ -918,7 +986,7 @@ export class Room {
       }
 
       if (!explode) {
-        for (const obstacle of OBSTACLES) {
+        for (const obstacle of this.activeObstacles()) {
           const t = segmentCircleHit(
             startX,
             startY,
@@ -979,7 +1047,7 @@ export class Room {
       const dy = player.physics.y - grenade.y;
       if (dx * dx + dy * dy > radiusSq) continue;
       // Parede da casa entre a explosão e o alvo blinda (vestíbulo contém).
-      if (explosionBlockedByWall(grenade.x, grenade.y, player.physics.x, player.physics.y)) {
+      if (explosionBlockedByWall(grenade.x, grenade.y, player.physics.x, player.physics.y, this.activeObstacles())) {
         continue;
       }
 
@@ -1116,7 +1184,7 @@ export class Room {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const x = ARENA.inset + 60 + Math.random() * (ARENA.width - 2 * ARENA.inset - 120);
       const y = ARENA.inset + 60 + Math.random() * (ARENA.height - 2 * ARENA.inset - 120);
-      if (pointBlockedByObstacle(x, y, PLAYER.radius + 8)) continue;
+      if (pointBlockedByObstacle(x, y, PLAYER.radius + 8, this.activeObstacles())) continue;
       return { x, y };
     }
     return { x: ARENA.width / 2, y: ARENA.height / 2 };
@@ -1403,7 +1471,7 @@ export class Room {
       let hitPlayer: ServerPlayer | null = null;
       let hitObstacle: { x: number; y: number } | null = null;
 
-      for (const obstacle of OBSTACLES) {
+      for (const obstacle of this.activeObstacles()) {
         const t = segmentCircleHit(
           startX,
           startY,
@@ -1694,6 +1762,7 @@ export class Room {
       phase: this.phase,
       timeLeft: round(this.timeLeft),
       winnerId: this.winnerId,
+      mapId: this.mapId,
       players,
       bullets,
       grenades,
@@ -1706,6 +1775,15 @@ export class Room {
               chose: [...this.players.values()].filter((player) => player.chosenCard).length,
               total: this.players.size,
               remaining: Math.max(0, Math.ceil(this.cardSelectionTimer)),
+            },
+          }
+        : {}),
+      ...(this.phase === 'waiting' && this.voting
+        ? {
+            mapVote: {
+              ...this.countVotes(),
+              remaining: Math.max(0, Math.ceil(this.voteTimer)),
+              total: this.players.size,
             },
           }
         : {}),

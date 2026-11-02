@@ -186,6 +186,12 @@ export class Session {
         this.room.handleChooseCard(this.player.id, card);
         break;
       }
+      case 'voteMap': {
+        if (!this.room || !this.player) return;
+        const map = typeof parsed.map === 'string' ? parsed.map : '';
+        this.room.handleVoteMap(this.player.id, map);
+        break;
+      }
       default:
         break;
     }
