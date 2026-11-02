@@ -1199,7 +1199,8 @@ export class Renderer {
     const ctx = this.ctx;
     for (const player of frame.players) {
       if (!player.alive || player.weapon !== 'flamethrower' || !player.shooting) continue;
-      if (player.invisible && !player.isSelf) continue;
+      // Chama visível mesmo com o dono invisível: o corpo some, o fogo revela
+      // a origem (balance do dash fantasma).
       ctx.save();
       ctx.translate(player.x, player.y);
       ctx.rotate(player.aim);
