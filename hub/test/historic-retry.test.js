@@ -7,11 +7,19 @@
 // usa o que o Hub enviar no play.
 //
 // Integração determinística: banco temp + geração de códigos controlada via
-// crypto.randomInt (C=2, D=3 no alfabeto do Hub). Sequência: CCCCC C (histórico,
+// crypto.randomInt (C=2, D=3 no alfabeto do Hub). Sequência: CCCCCC (histórico,
 // bloqueado) → DDDDDD (livre). O Hub deve pular o histórico e criar a sala
 // correta com o htok do launch.
 //
-// Execução: node --test hub/test/historic-retry.test.js (usa tsx src, NÃO dist).
+// PROVA VIA PROTOCOLO (não navegador): criador faz create_room e os outros
+// dois fazem join_room de verdade no Catan via socket.io, com código + htok
+// do SEU play, no mesmo caminho do cliente real (App.tsx). As TRÊS conexões
+// ficam ABERTAS até o fim das verificações: um broadcast `state` lista os
+// três membros com connected=true na mesma sala, e um chat de Alice chega
+// aos sockets abertos de Bob e Carol — registro no banco sozinho não prova
+// simultaneidade (conta membros mesmo desconectados).
+// Execução: node --test hub/test/historic-retry.test.js (usa o BUILD DE
+// PRODUÇÃO Games/Catan/dist/server.mjs com NODE_ENV=production, NÃO tsx src).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -56,9 +64,12 @@ function killTree(child) {
 
 async function startCatanServer(t, dbPath) {
   const port = await freePort();
-  const tsx = join(CATAN_ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
-  const entry = join(CATAN_ROOT, 'src', 'server', 'index.ts');
-  const child = spawn(process.execPath, [tsx, entry], {
+  // BUILD DE PRODUÇÃO (identidade Lane B: dist/server.mjs m+03:42 posterior ao
+  // src final — http.ts/handlers.ts 03:39 — com 409 CODE_TAKEN, `closed` e
+  // roomCodeExists sem filtro closed). cwd = raiz do Catan (SPA fallback
+  // resolve dist/client a partir do cwd em production).
+  const entry = join(CATAN_ROOT, 'dist', 'server.mjs');
+  const child = spawn(process.execPath, [entry], {
     cwd: CATAN_ROOT,
     detached: true,
     env: {
@@ -68,6 +79,7 @@ async function startCatanServer(t, dbPath) {
       DB_PATH: dbPath,
       HUB_SECRET: SECRET,
       HUB_TEST_HOOKS: '1',
+      NODE_ENV: 'production',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -191,22 +203,90 @@ async function catanClose(port, code, htok) {
 }
 
 // Socket.IO client via build ESM do Catan (hub não depende de socket.io-client).
-async function catanCreate(port, { roomCode, nickname, hubToken }) {
+// Conexão PERSISTENTE: acumula broadcasts `state`/`presence` (que refletem
+// conexão ativa) e só desconecta no teardown do teste. Timeouts em
+// connect/ack para falha nunca pendurar a suíte.
+const CATAN_IO_TIMEOUT_MS = 5000;
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
+async function catanConnect(port, { timeoutMs = CATAN_IO_TIMEOUT_MS } = {}) {
   const mod = await import(join(CATAN_ROOT, 'node_modules', 'socket.io-client', 'build', 'esm', 'index.js'));
   const socket = mod.io(`http://127.0.0.1:${port}`, { transports: ['websocket'], forceNew: true });
-  await new Promise((resolve, reject) => {
-    socket.once('connect', resolve);
-    socket.once('connect_error', reject);
-  });
+  const states = [];
+  socket.on('state', (view) => { states.push(view); });
+  try {
+    await withTimeout(
+      new Promise((resolve, reject) => {
+        socket.once('connect', resolve);
+        socket.once('connect_error', reject);
+      }),
+      timeoutMs,
+      `Catan: socket.io não conectou em ${timeoutMs}ms`,
+    );
+  } catch (err) {
+    try { socket.disconnect(); } catch { /* já fechado */ }
+    throw err;
+  }
+  return { socket, states };
+}
+
+let catanRequestSeq = 0;
+
+function catanLobbyAck(conn, payload, { timeoutMs = CATAN_IO_TIMEOUT_MS } = {}) {
+  const requestId = `req-${Date.now()}-${(catanRequestSeq += 1)}`;
+  return withTimeout(
+    new Promise((resolve) => {
+      conn.socket.emit('lobby', { requestId, payload }, (res) => resolve(res));
+    }),
+    timeoutMs,
+    `Catan: sem ack de lobby em ${timeoutMs}ms (${payload.type})`,
+  );
+}
+
+// Atalhos de uso único (pré-condição de colisão, testes close): conectam,
+// fazem o ack com timeout e desconectam — sem prova de simultaneidade.
+async function catanCreate(port, { roomCode, nickname, hubToken }) {
+  const conn = await catanConnect(port);
   try {
     const payload = { type: 'create_room', nickname, roomCode };
     if (hubToken) payload.hubToken = hubToken;
-    const res = await new Promise((resolve) => {
-      socket.emit('lobby', { requestId: `req-${Date.now()}`, payload }, (r) => resolve(r));
-    });
-    return res;
+    return await catanLobbyAck(conn, payload);
   } finally {
-    socket.disconnect();
+    conn.socket.disconnect();
+  }
+}
+
+// Mesmo caminho do cliente real (App.tsx): após o create=1, os demais fazem
+// join_room com { code, nickname, hubToken } — nunca create cego.
+async function catanJoin(port, { code, nickname, hubToken }) {
+  const conn = await catanConnect(port);
+  try {
+    const payload = { type: 'join_room', code, nickname };
+    if (hubToken) payload.hubToken = hubToken;
+    return await catanLobbyAck(conn, payload);
+  } finally {
+    conn.socket.disconnect();
+  }
+}
+
+function parsePlay(play) {
+  const q = new URL(play.url).searchParams;
+  return { room: q.get('room'), htok: q.get('htok'), name: q.get('name'), create: q.get('create') };
+}
+
+function roomMembers(dbPath, code) {
+  const db = new DatabaseSync(dbPath);
+  try {
+    return db.prepare('SELECT player_id AS id, name FROM members WHERE room_code = ? ORDER BY joined_at').all(code);
+  } finally {
+    db.close();
   }
 }
 
@@ -214,6 +294,9 @@ test('histórico bloqueia (409) e Hub tenta outro código até playing — sem L
   const dir = mkdtempSync(join(tmpdir(), 'hub-hist-'));
   const dbPath = join(dir, 'catan.db');
   t.after(() => { try { rmSync(dir, { recursive: true, force: true }); } catch {} });
+  // Sockets persistentes do Catan: fechados no teardown mesmo em falha.
+  const catanSockets = [];
+  t.after(() => { for (const s of catanSockets) { try { s.disconnect(); } catch {} } });
   // Histórico injetado ANTES do Catan abrir o DB (sem lock/busy); closed=1
   // não entra no Store, mas bloqueia reuse via roomCodeExists.
   initDbWithHistoric(dbPath, HIST_CODE);
@@ -278,12 +361,48 @@ test('histórico bloqueia (409) e Hub tenta outro código até playing — sem L
   // O Hub NÃO pode enviar o grupo ao código histórico: o único play create=1
   // deve trazer código livre (o teste não escolhe o 2º código — observa o Hub).
   const playA = await waitForPlay(a, 1, 8000);
-  const urlA = new URL(playA.url);
-  const gameCode = urlA.searchParams.get('room');
-  const htok = urlA.searchParams.get('htok');
-  assert.ok(htok && htok.length >= 16);
-  assert.notStrictEqual(gameCode, HIST_CODE, 'Hub não pode mandar o grupo à sala histórica/alheia');
-  assert.equal(gameCode, FREE_CODE, 'com sequência C→D, o retry deve cair no código livre');
+  const infoA = parsePlay(playA);
+  assert.equal(infoA.create, '1');
+  assert.equal(infoA.name, 'Alice');
+  assert.ok(infoA.htok && infoA.htok.length >= 16);
+  assert.notStrictEqual(infoA.room, HIST_CODE, 'Hub não pode mandar o grupo à sala histórica/alheia');
+  assert.equal(infoA.room, FREE_CODE, 'com sequência C→D, o retry deve cair no código livre');
+  const gameCode = infoA.room;
+  const htok = infoA.htok;
+
+  // O criador cria a sala correta no Catan real com o htok do launch — a
+  // conexão PERMANECE ABERTA até o fim das verificações (prova de
+  // simultaneidade, não só registro no banco).
+  const sockA = await catanConnect(catanPort);
+  catanSockets.push(sockA.socket);
+  const created = await catanLobbyAck(sockA, { type: 'create_room', nickname: 'Alice', roomCode: gameCode, hubToken: htok });
+  assert.equal(created.ok, true, `create no Catan real deve funcionar: ${JSON.stringify(created)}`);
+
+  // Cada play é aguardado e conferido (código, htok, nome, create) e cada
+  // membro entra com os dados do SEU play — nunca com o play alheio. O Hub
+  // só emite create=0 após o create do criador existir no jogo (poll),
+  // por isso Bob/Carol aguardam o próprio play antes do join.
+  const playB = await waitForPlay(b, 0, 8000);
+  const infoB = parsePlay(playB);
+  assert.equal(infoB.create, '0');
+  assert.equal(infoB.name, 'Bob');
+  assert.equal(infoB.room, gameCode);
+  assert.equal(infoB.htok, htok);
+  const sockB = await catanConnect(catanPort);
+  catanSockets.push(sockB.socket);
+  const joinedB = await catanLobbyAck(sockB, { type: 'join_room', code: infoB.room, nickname: 'Bob', hubToken: infoB.htok });
+  assert.equal(joinedB.ok, true, `Bob deve entrar na sala nova: ${JSON.stringify(joinedB)}`);
+
+  const playC = await waitForPlay(c, 0, 8000);
+  const infoC = parsePlay(playC);
+  assert.equal(infoC.create, '0');
+  assert.equal(infoC.name, 'Carol');
+  assert.equal(infoC.room, gameCode);
+  assert.equal(infoC.htok, htok);
+  const sockC = await catanConnect(catanPort);
+  catanSockets.push(sockC.socket);
+  const joinedC = await catanLobbyAck(sockC, { type: 'join_room', code: infoC.room, nickname: 'Carol', hubToken: infoC.htok });
+  assert.equal(joinedC.ok, true, `Carol deve entrar na sala nova: ${JSON.stringify(joinedC)}`);
 
   // Nenhum play apontou para o histórico.
   for (const cl of [a, b, c]) {
@@ -292,28 +411,71 @@ test('histórico bloqueia (409) e Hub tenta outro código até playing — sem L
     }
   }
 
-  // O criador cria a sala correta no Catan real com o htok do launch.
-  const created = await catanCreate(catanPort, { roomCode: gameCode, nickname: 'Alice', hubToken: htok });
-  assert.equal(created.ok, true, `create no Catan real deve funcionar: ${JSON.stringify(created)}`);
+  // Simultaneidade: com as TRÊS conexões abertas, um broadcast `state` lista
+  // os três membros corretos na mesma sala, todos connected=true. players=3
+  // no HTTP ou no banco não provaria isso (contam membros desconectados).
+  let simultaneous = null;
+  await waitForCondition(() => {
+    const views = [...sockA.states, ...sockB.states, ...sockC.states];
+    simultaneous = views.find((v) => (
+      v?.roomCode === gameCode
+      && Array.isArray(v.players) && v.players.length === 3
+      && v.players.every((p) => p.connected === true)
+    )) ?? null;
+    return simultaneous !== null;
+  }, 5000, 20);
+  assert.deepStrictEqual(simultaneous.players.map((p) => p.name).sort(), ['Alice', 'Bob', 'Carol']);
 
-  // Os demais entram (create=0) e o Hub leva a sala a playing.
-  await waitForPlay(b, 0, 8000);
-  await waitForPlay(c, 0, 8000);
+  // Prova viva: Alice envia chat pelo caminho real do cliente (Lobby.tsx →
+  // lobby {type:'chat'}); os sockets AINDA ABERTOS de Bob e Carol recebem o
+  // broadcast com a mensagem — quem desconectou não receberia nada.
+  const probe = `sinc-${Date.now()}`;
+  const chatAck = await catanLobbyAck(sockA, { type: 'chat', text: probe });
+  assert.equal(chatAck.ok, true, `chat deve funcionar: ${JSON.stringify(chatAck)}`);
+  let liveB = null;
+  let liveC = null;
+  await waitForCondition(() => {
+    const hasProbe = (conn) => conn.states.some((v) => (v.chat ?? []).some((m) => m.text === probe && m.name === 'Alice'));
+    liveB = hasProbe(sockB) ? true : null;
+    liveC = hasProbe(sockC) ? true : null;
+    return liveB && liveC;
+  }, 5000, 20);
+  for (const [label, s] of [['Alice', sockA], ['Bob', sockB], ['Carol', sockC]]) {
+    assert.equal(s.socket.connected, true, `socket de ${label} deve seguir aberto`);
+  }
+
+  // O Hub leva a sala a playing (plays create=0 já conferidos acima).
   await waitForRoom(a, 'playing', 8000);
   await waitForRoom(b, 'playing', 8000);
   assert.equal(hub.snapshot().rooms[0].match.gameCode, gameCode);
 
-  // Estado no jogo confirma dono; histórico segue intacto e bloqueado.
+  // Estado no jogo confirma dono + TRÊS jogadores na mesma sala nova.
   const stGame = await catanState(catanPort, gameCode);
   assert.equal(stGame.status, 200);
   assert.equal(stGame.body.room.hubOwner, htok);
+  assert.equal(stGame.body.room.players, 3, 'os três devem estar na sala nova do Catan');
+  const fresh = roomMembers(dbPath, gameCode).map((m) => m.name).sort();
+  assert.deepStrictEqual(fresh, ['Alice', 'Bob', 'Carol']);
+  // Ninguém em outra partida: só a sala nova está aberta; o histórico segue
+  // fechado com o membro original e o chat intactos.
   const kept2 = historicPreserved(dbPath, HIST_CODE);
   assert.equal(kept2.members, 1, 'histórico preservado após retry');
   assert.equal(kept2.chat, 1);
+  assert.equal(kept2.closed, 1);
+  assert.deepStrictEqual(roomMembers(dbPath, HIST_CODE).map((m) => m.name), ['Zed']);
   assert.equal((await catanState(catanPort, HIST_CODE)).status, 409);
 
   // Sala do Hub utilizável após o fluxo (grupo não ficou preso em launching).
   assert.equal(hub.snapshot().rooms[0].phase, 'playing');
+
+  // Hub segue utilizável: novo cliente cria outra sala e fica em lobby.
+  const d = await connectClient(port); clients.push(d);
+  await d.hello({ nick: 'Dave' });
+  d.send({ t: 'create_room', gameId: 'catan', capacity: 3 });
+  const room2 = await waitForRoom(d, 'lobby');
+  assert.ok(room2.room.code);
+  assert.notStrictEqual(room2.room.code, room.room.code);
+  assert.equal(hub.snapshot().rooms.length, 2);
 });
 
 test('Catan close: sucesso/inexistente idempotente com closed booleano; 403 preserva', async (t) => {

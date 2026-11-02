@@ -234,6 +234,15 @@ function focusElement(el, options) {
   }
 }
 
+// Teclado (WASD) vai ao jogo: o jogo escuta no window do iframe, então o foco precisa estar no frame.
+function focusMatchFrame() {
+  const frame = dom.matchFrameWrap ? dom.matchFrameWrap.querySelector('iframe') : null;
+  if (!frame) return false;
+  try { frame.focus({ preventScroll: true }); } catch { try { frame.focus(); } catch { /* ignora */ } }
+  try { const w = frame.contentWindow; if (w && typeof w.focus === 'function') w.focus(); } catch { /* cross-origin-safe */ }
+  return true;
+}
+
 function withFocusPreserved(renderFn) {
   const active = document.activeElement;
   const key = active && active.dataset ? active.dataset.focusKey : null;
@@ -1543,16 +1552,21 @@ function renderMatch() {
     frame.title = `Partida de ${gameName}`;
     frame.setAttribute('allow', 'autoplay; fullscreen; gamepad');
     frame.allowFullscreen = true;
+    frame.tabIndex = 0;
     dom.matchFrameWrap.append(frame);
   }
-  if (frame.dataset.url !== state.play.url) {
+  const urlChanged = frame.dataset.url !== state.play.url;
+  if (urlChanged) {
     frame.dataset.url = state.play.url;
+    frame.addEventListener('load', () => { focusMatchFrame(); }, { once: true });
     frame.src = state.play.url;
   }
 
   if (!state.matchShown) {
     state.matchShown = true;
-    focusElement(dom.leaveMatch);
+    focusMatchFrame();
+  } else if (urlChanged) {
+    focusMatchFrame();
   }
 }
 
@@ -1576,7 +1590,7 @@ function renderLaunch() {
   } else if (state.launchShown) {
     state.launchShown = false;
     if (dom.launchOverlay.contains(document.activeElement)) {
-      if (isMatchActive()) focusElement(dom.leaveMatch);
+      if (isMatchActive()) { if (!focusMatchFrame()) focusElement(dom.leaveMatch); }
       else if (state.screen === 'room') focusRoomHeading();
       else if (state.screen === 'home') focusHomeHeading();
     }
