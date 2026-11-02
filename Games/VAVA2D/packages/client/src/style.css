@@ -1392,3 +1392,70 @@ kbd {
   font-size: 11px;
   line-height: 1.4;
 }
+
+.mapvote-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.mapvote-option {
+  padding: 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(12, 20, 10, 0.7);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.mapvote-option:hover {
+  transform: translateY(-2px);
+}
+
+#mapvote-field:hover {
+  border-color: rgba(142, 215, 126, 0.7);
+}
+
+#mapvote-city:hover {
+  border-color: rgba(34, 211, 238, 0.7);
+}
+
+.mapvote-option strong {
+  display: block;
+  font-size: 14px;
+}
+
+#mapvote-field strong {
+  color: #8ed77e;
+}
+
+#mapvote-city strong {
+  color: #22d3ee;
+}
+
+.mapvote-option span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.mapvote-option b {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
+  font-family: ui-monospace, monospace;
+}
+
+.mapvote-option.picked {
+  outline: 2px solid currentColor;
+}
+
+#mapvote-status {
+  margin: 12px 0 0;
+  text-align: center;
+}

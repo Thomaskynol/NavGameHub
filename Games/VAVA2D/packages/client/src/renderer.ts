@@ -1,5 +1,5 @@
-import { ARENA, DUEL_ARENA, HOUSE, HOUSE_DOORS, HOUSE_WALL_RUNS, OBSTACLES, PLAYER, WEAPONS, segmentCircleHit } from '@vava/shared';
-import type { Obstacle } from '@vava/shared';
+import { ARENA, CITY_BUILDINGS, CITY_OBSTACLES, CITY_WALL_RUNS, DUEL_ARENA, HOUSE, HOUSE_DOORS, HOUSE_WALL_RUNS, OBSTACLES, PLAYER, WEAPONS, obstaclesFor, segmentCircleHit } from '@vava/shared';
+import type { MapId, Obstacle } from '@vava/shared';
 import type { Effects } from './effects.js';
 import { mulberry32 } from './rng.js';
 
@@ -52,6 +52,7 @@ export interface RenderPowerup {
 export interface RenderFrame {
   dt: number;
   now: number;
+  mapId: MapId;
   camera: { x: number; y: number; scale: number };
   players: RenderPlayer[];
   bullets: RenderBullet[];
@@ -136,6 +137,13 @@ const smallStones = Array.from({ length: 36 }, () => ({
 }));
 
 const obstaclesByDepth = [...OBSTACLES].sort((a, b) => a.y - b.y);
+const cityObstaclesByDepth = [...CITY_OBSTACLES].sort((a, b) => a.y - b.y);
+
+const CITY_NEON: Record<string, string> = {
+  cyan: '#22d3ee',
+  magenta: '#f471b5',
+  purple: '#a78bfa',
+};
 
 function shade(hex: string, factor: number): string {
   const clean = hex.replace('#', '');
@@ -220,6 +228,11 @@ export class Renderer {
     const top = frame.camera.y - viewHeight / 2 - 140;
     const right = frame.camera.x + viewWidth / 2 + 140;
     const bottom = frame.camera.y + viewHeight / 2 + 140;
+
+    if (frame.mapId === 'city') {
+      this.drawCity(frame, left, top, right, bottom);
+      return;
+    }
 
     // Solo em volta da arena.
     ctx.fillStyle = this.soilPattern ?? '#655039';
@@ -449,8 +462,325 @@ export class Renderer {
     ctx.restore();
   }
 
-  private drawDuelRing(active: boolean): void {
+  // Cidade Neon: base escura + ruas + prédios com fio neon moderado.
+  // Coberturas reaproveitam kind: 'rock' vira carro/contêiner, 'tree' vira
+  // barreira/poste; 'wall' desenha como parede (trechos CITY_WALL_RUNS).
+  private drawCity(
+    frame: RenderFrame,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+  ): void {
     const ctx = this.ctx;
+    ctx.fillStyle = '#10131d';
+    ctx.fillRect(0, 0, ARENA.width, ARENA.height);
+
+    ctx.fillStyle = '#222a3f';
+    const streets: Array<[number, number, number, number]> = [
+      [0, 700, ARENA.width, 160], // avenida principal
+      [1120, 0, 160, ARENA.height], // avenida vertical
+      [0, 380, ARENA.width, 80], // secundária norte
+      [0, 1140, ARENA.width, 80], // secundária sul
+      [600, 0, 130, ARENA.height], // beco oeste
+      [1670, 0, 130, ARENA.height], // beco leste
+      [1060, 640, 280, 320], // praça central
+    ];
+    for (const [x, y, w, h] of streets) ctx.fillRect(x, y, w, h);
+
+    // Faixas das avenidas (ciano contido) + zebrinhas da praça.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.35)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([26, 30]);
+    ctx.beginPath();
+    ctx.moveTo(0, 780);
+    ctx.lineTo(ARENA.width, 780);
+    ctx.moveTo(1200, 0);
+    ctx.lineTo(1200, ARENA.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(230, 237, 250, 0.28)';
+    for (let x = 1132; x < 1268; x += 18) {
+      ctx.fillRect(x, 648, 9, 26);
+      ctx.fillRect(x, 926, 9, 26);
+    }
+    ctx.restore();
+
+    // Letreiro pintado na praça (único texto grande do mapa).
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#f471b5';
+    ctx.font = '700 30px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CIDADE NEON', 1200, 945);
+    ctx.restore();
+
+    for (const building of CITY_BUILDINGS) {
+      if (building.x1 < left || building.x0 > right || building.y1 < top || building.y0 > bottom) {
+        continue;
+      }
+      this.drawCityBuilding(building);
+    }
+
+    if (frame.duelActive) {
+      ctx.save();
+      ctx.fillStyle = '#0b0e18';
+      ctx.fillRect(DUEL_ARENA.minX - 120, DUEL_ARENA.minY - 120, DUEL_ARENA.maxX - DUEL_ARENA.minX + 240, DUEL_ARENA.maxY - DUEL_ARENA.minY + 240);
+      ctx.restore();
+      this.drawDuelRing(true);
+    }
+
+    for (const obstacle of cityObstaclesByDepth) {
+      if (obstacle.kind === 'wall') continue;
+      if (
+        obstacle.x + obstacle.radius * 1.6 < left ||
+        obstacle.x - obstacle.radius * 1.6 > right ||
+        obstacle.y + obstacle.radius * 1.6 < top ||
+        obstacle.y - obstacle.radius * 1.6 > bottom
+      ) {
+        continue;
+      }
+      if (obstacle.kind === 'rock') {
+        if (obstacle.radius >= 44) this.drawContainer(obstacle);
+        else this.drawCar(obstacle);
+      } else {
+        if (obstacle.radius < 30) this.drawNeonPole(obstacle);
+        else this.drawBarrier(obstacle);
+      }
+    }
+    this.drawCityWalls();
+    this.drawCityRim();
+  }
+
+  private drawCityBuilding(building: (typeof CITY_BUILDINGS)[number]): void {
+    const ctx = this.ctx;
+    const { x0, y0, x1, y1 } = building;
+    const w = x1 - x0;
+    const h = y1 - y0;
+    const neon = CITY_NEON[building.neon] ?? '#22d3ee';
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(x0 - 4 + 6, y0 - 4 + 8, w + 8, h + 8);
+    // Laje: aberta mais clara (entra gente), fechada escura (cenário).
+    ctx.fillStyle = building.open ? '#1c2438' : '#141a2a';
+    ctx.fillRect(x0, y0, w, h);
+    // Janelas em grade determinística (só decor).
+    const rng = mulberry32(7000 + Math.round(x0 + y0));
+    ctx.fillStyle = building.open ? 'rgba(255, 210, 125, 0.5)' : 'rgba(120, 140, 180, 0.25)';
+    for (let wy = y0 + 22; wy < y1 - 10; wy += 34) {
+      for (let wx = x0 + 22; wx < x1 - 10; wx += 34) {
+        if (rng() < (building.open ? 0.45 : 0.3)) ctx.fillRect(wx, wy, 14, 10);
+      }
+    }
+    if (!building.open) {
+      // Persianas: prédio fechado lê como fechado.
+      ctx.strokeStyle = 'rgba(90, 110, 150, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let wx = x0 + 14; wx < x1; wx += 18) {
+        ctx.moveTo(wx, y0 + 6);
+        ctx.lineTo(wx, y1 - 6);
+      }
+      ctx.stroke();
+    }
+    // Fio neon no perímetro (sombra leve, um por prédio).
+    ctx.save();
+    ctx.shadowColor = neon;
+    ctx.shadowBlur = 10;
+    ctx.strokeStyle = neon;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(x0, y0, w, h);
+    ctx.restore();
+    // Plaquinha com o nome.
+    ctx.fillStyle = neon;
+    ctx.globalAlpha = 0.85;
+    ctx.font = '700 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(building.open ? building.name : `${building.name} · FECHADO`, (x0 + x1) / 2, y0 - 10);
+    ctx.restore();
+  }
+
+  private drawCityWalls(): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const pass of [true, false]) {
+      for (const run of CITY_WALL_RUNS) {
+        if (run.interior !== pass) continue;
+        ctx.strokeStyle = '#0b1220';
+        ctx.lineWidth = run.interior ? 30 : 40;
+        ctx.beginPath();
+        ctx.moveTo(run.x1, run.y1);
+        ctx.lineTo(run.x2, run.y2);
+        ctx.stroke();
+        ctx.strokeStyle = run.interior ? '#3a4a6e' : '#4a5c86';
+        ctx.lineWidth = run.interior ? 20 : 28;
+        ctx.beginPath();
+        ctx.moveTo(run.x1, run.y1);
+        ctx.lineTo(run.x2, run.y2);
+        ctx.stroke();
+      }
+    }
+    // Fio superior contido: paredes legíveis no escuro sem ofuscar.
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+    ctx.lineWidth = 2;
+    for (const run of CITY_WALL_RUNS) {
+      if (run.interior) continue;
+      ctx.beginPath();
+      ctx.moveTo(run.x1, run.y1 - 12);
+      ctx.lineTo(run.x2, run.y2 - 12);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  private drawCityRim(): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.35)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, ARENA.width - 6, ARENA.height - 6);
+    ctx.fillStyle = 'rgba(244, 113, 181, 0.7)';
+    for (const [x, y] of [[0, 0], [ARENA.width, 0], [0, ARENA.height], [ARENA.width, ARENA.height]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawCar(obstacle: Obstacle): void {
+    const ctx = this.ctx;
+    const r = obstacle.radius;
+    const horizontal = (obstacle.id % 2) === 0;
+    const w = horizontal ? r * 2.1 : r * 1.15;
+    const h = horizontal ? r * 1.15 : r * 2.1;
+    ctx.save();
+    ctx.translate(obstacle.x, obstacle.y);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(3, 4, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const hues = ['#b3402a', '#2a6db3', '#c9a13b'];
+    ctx.fillStyle = hues[obstacle.id % hues.length] ?? '#b3402a';
+    ctx.beginPath();
+    ctx.roundRect(-w / 2, -h / 2, w, h, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(5, 8, 14, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#0e1626';
+    ctx.beginPath();
+    ctx.roundRect(-w / 4, -h / 4, w / 2, h / 2, 4);
+    ctx.fill();
+    // Faróis acesos: o carro lê de noite sem esconder ninguém.
+    ctx.save();
+    ctx.shadowColor = '#ffe9a8';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ffe9a8';
+    if (horizontal) {
+      ctx.beginPath();
+      ctx.arc(w / 2 - 2, -h / 4, 2.5, 0, Math.PI * 2);
+      ctx.arc(w / 2 - 2, h / 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(-w / 4, h / 2 - 2, 2.5, 0, Math.PI * 2);
+      ctx.arc(w / 4, h / 2 - 2, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+
+  private drawContainer(obstacle: Obstacle): void {
+    const ctx = this.ctx;
+    const r = obstacle.radius;
+    const w = r * 2;
+    const h = r * 1.25;
+    ctx.save();
+    ctx.translate(obstacle.x, obstacle.y);
+    ctx.rotate((obstacle.id % 2) === 0 ? 0.06 : -0.05);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(-w / 2 + 3, -h / 2 + 5, w, h);
+    ctx.fillStyle = obstacle.id % 2 === 0 ? '#3f6b4f' : '#6b4a2f';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.strokeStyle = 'rgba(5, 8, 14, 0.85)';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(-w / 2, -h / 2, w, h);
+    // Nervuras.
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = -w / 2 + 12; x < w / 2; x += 12) {
+      ctx.moveTo(x, -h / 2 + 2);
+      ctx.lineTo(x, h / 2 - 2);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawBarrier(obstacle: Obstacle): void {
+    const ctx = this.ctx;
+    const r = obstacle.radius;
+    ctx.save();
+    ctx.translate(obstacle.x, obstacle.y);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(2, 3, r, r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#d8b93c';
+    ctx.strokeStyle = '#11141d';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(-r, -r * 0.45, r * 2, r * 0.9, 4);
+    ctx.fill();
+    ctx.stroke();
+    // Listras de alerta.
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(-r, -r * 0.45, r * 2, r * 0.9, 4);
+    ctx.clip();
+    ctx.fillStyle = '#11141d';
+    for (let x = -r * 1.4; x < r * 1.4; x += 14) {
+      ctx.beginPath();
+      ctx.moveTo(x, -r * 0.5);
+      ctx.lineTo(x + 8, r * 0.5);
+      ctx.lineTo(x + 13, r * 0.5);
+      ctx.lineTo(x + 5, -r * 0.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+
+  private drawNeonPole(obstacle: Obstacle): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(obstacle.x, obstacle.y);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(2, 3, 8, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#2b3550';
+    ctx.fillRect(-3, -14, 6, 28);
+    const color = obstacle.id % 2 === 0 ? '#22d3ee' : '#f471b5';
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, -14, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  }
+
+  private drawDuelRing(active: boolean): void {    const ctx = this.ctx;
     const { minX, maxX, minY, maxY } = DUEL_ARENA;
     const w = maxX - minX;
     const h = maxY - minY;
@@ -1197,14 +1527,14 @@ export class Renderer {
 
   // Alcance visível da chama: encurta na primeira parede (kind 'wall'), como o
   // dano no servidor; mato/pedra não encurtam.
-  private flameLength(x: number, y: number, aim: number, range: number): number {
+  private flameLength(x: number, y: number, aim: number, range: number, mapId: MapId): number {
     const muzzle = WEAPONS.flamethrower.muzzleOffset;
     const ox = x + Math.cos(aim) * muzzle;
     const oy = y + Math.sin(aim) * muzzle;
     const tx = ox + Math.cos(aim) * range;
     const ty = oy + Math.sin(aim) * range;
     let best = 1;
-    for (const obstacle of OBSTACLES) {
+    for (const obstacle of obstaclesFor(mapId)) {
       if (obstacle.kind !== 'wall') continue;
       const sx = ox - obstacle.x;
       const sy = oy - obstacle.y;
@@ -1222,7 +1552,7 @@ export class Renderer {
       // Chama visível mesmo com o dono invisível: o corpo some, o fogo revela
       // a origem (balance do dash fantasma).
       const range = WEAPONS.flamethrower.flameRange;
-      const len = this.flameLength(player.x, player.y, player.aim, range);
+      const len = this.flameLength(player.x, player.y, player.aim, range, frame.mapId);
       const half = 10 + ((len - 18) / (360 - 18)) * 45;
       ctx.save();
       ctx.translate(player.x, player.y);

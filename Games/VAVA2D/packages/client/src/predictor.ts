@@ -1,5 +1,5 @@
-import { TICK_DT, WEAPONS, stepPlayerPhysics } from '@vava/shared';
-import type { PlayerInput, PlayerPhysics, SelfState } from '@vava/shared';
+import { OBSTACLES, TICK_DT, WEAPONS, obstaclesFor, stepPlayerPhysics } from '@vava/shared';
+import type { MapId, Obstacle, PlayerInput, PlayerPhysics, SelfState } from '@vava/shared';
 
 function clampOffset(value: number): number {
   return Math.max(-120, Math.min(120, value));
@@ -11,6 +11,12 @@ export class Predictor {
   private offset = { x: 0, y: 0 };
   alive = false;
   private speed = 225;
+  private obstacles: readonly Obstacle[] = OBSTACLES;
+
+  /** Física local segue o mapa votado (mesmos obstáculos do servidor). */
+  setMap(map: MapId): void {
+    this.obstacles = obstaclesFor(map);
+  }
 
   get state(): PlayerPhysics | null {
     return this.physicsState;
@@ -67,7 +73,7 @@ export class Predictor {
 
     this.pending = this.pending.filter((input) => input.seq > self.ack);
     for (const input of this.pending) {
-      stepPlayerPhysics(this.physicsState, input, TICK_DT, undefined, this.speed);
+      stepPlayerPhysics(this.physicsState, input, TICK_DT, this.obstacles, this.speed);
     }
 
     const dx = oldX - this.physicsState.x;
@@ -85,7 +91,7 @@ export class Predictor {
     if (!this.physicsState || !this.alive) return;
     this.pending.push(input);
     if (this.pending.length > 600) this.pending.splice(0, 300);
-    stepPlayerPhysics(this.physicsState, input, TICK_DT, undefined, this.speed);
+    stepPlayerPhysics(this.physicsState, input, TICK_DT, this.obstacles, this.speed);
   }
 
   reset(): void {

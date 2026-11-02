@@ -2,11 +2,13 @@ import {
   TICK_DT,
   WEAPONS,
   CARD_INFO,
+  MAP_NAMES,
   lerp,
   lerpAngle,
 } from '@vava/shared';
 import type {
   GameEvent,
+  MapId,
   ServerMessage,
   Snapshot,
 } from '@vava/shared';
@@ -62,6 +64,9 @@ export class Game {
   private cardTimerHandle: number | null = null;
   private duelTimerHandle: number | null = null;
   private cardChosen = false;
+  private mapId: MapId = 'field';
+  private votedMap: MapId | null = null;
+  private mapvoteBound = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -75,6 +80,7 @@ export class Game {
       leave: () => this.leaveSession(),
       reload: () => window.location.reload(),
     });
+    this.bindMapVote();
 
     window.addEventListener('keydown', (event) => {
       if (event.code !== 'Escape' || !this.joined) return;
@@ -233,6 +239,9 @@ export class Game {
     this.pingAccumulator = 0;
     this.cameraPrimed = false;
     this.hitMarkerUntil = 0;
+    this.mapId = 'field';
+    this.votedMap = null;
+    document.getElementById('mapvote-overlay')?.classList.add('hidden');
 
     this.input.setEnabled(false);
     this.predictor.reset();
@@ -315,6 +324,53 @@ export class Game {
       `Carta escolhida. Aguardando os outros jogadores… ${progress.chose}/${progress.total} · ${progress.remaining}s`;
   }
 
+  private bindMapVote(): void {
+    if (this.mapvoteBound) return;
+    this.mapvoteBound = true;
+    document.getElementById('mapvote-field')?.addEventListener('click', () => this.voteMap('field'));
+    document.getElementById('mapvote-city')?.addEventListener('click', () => this.voteMap('city'));
+  }
+
+  private voteMap(map: MapId): void {
+    this.votedMap = map;
+    this.connection?.send({ t: 'voteMap', map });
+    this.refreshMapVote();
+  }
+
+  /** Overlay de votação: 2 botões + timer + placar ao vivo; some ao começar. */
+  private updateMapVote(snapshot: Snapshot): void {
+    const overlay = document.getElementById('mapvote-overlay');
+    if (!overlay) return;
+    if (snapshot.phase !== 'waiting' || !snapshot.mapVote) {
+      overlay.classList.add('hidden');
+      this.votedMap = null;
+      return;
+    }
+    overlay.classList.remove('hidden');
+    this.refreshMapVote();
+  }
+
+  private refreshMapVote(): void {
+    const vote = this.latest?.mapVote;
+    if (!vote) return;
+    const timer = document.getElementById('mapvote-timer');
+    const fieldCount = document.getElementById('mapvote-field-count');
+    const cityCount = document.getElementById('mapvote-city-count');
+    const status = document.getElementById('mapvote-status');
+    const fieldBtn = document.getElementById('mapvote-field');
+    const cityBtn = document.getElementById('mapvote-city');
+    if (!timer || !fieldCount || !cityCount || !status) return;
+    timer.textContent = String(Math.max(0, vote.remaining));
+    fieldCount.textContent = String(vote.field);
+    cityCount.textContent = String(vote.city);
+    fieldBtn?.classList.toggle('picked', this.votedMap === 'field');
+    cityBtn?.classList.toggle('picked', this.votedMap === 'city');
+    status.textContent =
+      this.votedMap !== null
+        ? `Você votou em ${MAP_NAMES[this.votedMap]} — aguardando…`
+        : `Escolha o mapa · ${vote.total} na sala · quem não votar se abstém`;
+  }
+
   private onSnapshot(snapshot: Snapshot): void {
     const previous = this.latest;
     const snapCamera =
@@ -324,8 +380,13 @@ export class Game {
           (!previous.you.alive && snapshot.you.alive)));
 
     this.latest = snapshot;
+    if (snapshot.mapId !== this.mapId) {
+      this.mapId = snapshot.mapId;
+      this.predictor.setMap(snapshot.mapId);
+    }
     this.interpolator.push(snapshot, performance.now());
     this.predictor.applyServerState(snapshot.you);
+    this.updateMapVote(snapshot);
 
     if (snapshot.phase === 'cardSelection') {
       if (this.cardChosen) this.refreshCardWaiting();
@@ -693,6 +754,7 @@ export class Game {
       {
         dt,
         now,
+        mapId: this.mapId,
         camera: { x: this.camera.x, y: this.camera.y, scale: this.camera.scale },
         players: [...players.values()],
         bullets,
