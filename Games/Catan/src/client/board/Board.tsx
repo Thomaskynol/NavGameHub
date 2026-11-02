@@ -63,18 +63,18 @@ function Token({ x, y, number }: { x: number; y: number; number: number }) {
   const hot = number === 6 || number === 8;
   const n = pipsFor(number);
   const dots: { cx: number; cy: number }[] = [];
-  const gap = 4.4;
+  const gap = 5.2;
   const start = -((n - 1) * gap) / 2;
-  for (let i = 0; i < n; i++) dots.push({ cx: x + start + i * gap, cy: y + 15 });
+  for (let i = 0; i < n; i++) dots.push({ cx: x + start + i * gap, cy: y + 11 });
   return (
     <g pointerEvents="none">
       <circle cx={x} cy={y} r={14.5} fill="#f3e6c8" stroke="#8a6d3b" strokeWidth={1.4} />
       <circle cx={x} cy={y} r={12} fill="none" stroke="#d8bf8a" strokeWidth={0.8} />
       <text
         x={x}
-        y={y + 4.5}
+        y={y + 3}
         textAnchor="middle"
-        fontSize={14}
+        fontSize={15}
         fontWeight={800}
         fontFamily="Georgia, serif"
         fill={hot ? '#b33a2e' : '#2a1c10'}
@@ -82,7 +82,7 @@ function Token({ x, y, number }: { x: number; y: number; number: number }) {
         {number}
       </text>
       {dots.map((d, i) => (
-        <circle key={i} cx={d.cx} cy={d.cy} r={1.35} fill={hot ? '#b33a2e' : '#5a4630'} />
+        <circle key={i} cx={d.cx} cy={d.cy} r={2} fill={hot ? '#b33a2e' : '#3d2c1c'} />
       ))}
     </g>
   );
