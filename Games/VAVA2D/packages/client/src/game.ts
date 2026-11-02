@@ -634,7 +634,7 @@ export class Game {
       }
 
       for (const drop of pair.after.drops) {
-        drops.push({ id: drop.id, x: drop.x, y: drop.y });
+        drops.push({ id: drop.id, x: drop.x, y: drop.y, weapon: drop.weapon });
         dropTargets.push({ x: drop.x, y: drop.y });
       }
 

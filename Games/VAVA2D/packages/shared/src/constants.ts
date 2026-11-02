@@ -173,13 +173,13 @@ export const POWERUP = {
   ],
 } as const;
 
-// Ringue do Duelo Mortal: sub-retângulo livre de obstáculos (servidor dá clamp,
-// cliente desenha o ringue). Spawns do duelo: (1125,1075) e (1375,1075).
+// Ringue do Duelo Mortal: região off-map além de 2400x1600 (servidor dá clamp,
+// cliente desenha o ringue só com duelo ativo). Spawns do duelo: (2675,800) e (2925,800).
 export const DUEL_ARENA = {
-  minX: 1050,
-  maxX: 1450,
-  minY: 900,
-  maxY: 1250,
+  minX: 2600,
+  maxX: 3000,
+  minY: 625,
+  maxY: 975,
 } as const;
 
 export const DUEL = {
@@ -197,7 +197,7 @@ export const CARD_INFO: Record<CardType, { title: string; description: string }>
   slowKnockback: { title: 'Balas Pesadas', description: 'Balas mais lentas, mas empurram inimigos ao acertar.' },
   wallBounce: { title: 'Quicada Letal', description: 'Bala bate 1 vez na parede e causa +50% de dano.' },
   chargedShot: { title: 'Tiro Carregado', description: 'Após 2s sem atirar, o próximo tiro causa +20% de dano e é 30% mais rápido.' },
-  dashInvis: { title: 'Dash Fantasma', description: 'Fica invisível por 1s ao dar dash.' },
+  dashInvis: { title: 'Dash Fantasma', description: 'Fica invisível por 3s ao dar dash.' },
 };
 
 export const CARD_TYPES: CardType[] = [

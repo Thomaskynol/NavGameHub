@@ -550,7 +550,7 @@ export class Room {
     const baseSpeed = WEAPONS[player.weapon].speed;
     const speed = baseSpeed * (player.speedBoost > 0 ? 1.5 : 1) * (player.giant > 0 ? 0.9 : 1);
     const obstacles = player.inDuel ? [] : OBSTACLES;
-    const bounds = player.inDuel ? undefined : undefined;
+    const dashReady = player.physics.dashCooldown <= 0 && player.physics.dashTime <= 0;
     stepPlayerPhysics(player.physics, input, dt, obstacles, speed);
     if (player.inDuel) {
       // clamp ao ringue (sem obstáculos lá dentro)
@@ -558,6 +558,10 @@ export class Room {
       if (player.physics.x > DUEL_ARENA.maxX) { player.physics.x = DUEL_ARENA.maxX; if (player.physics.vx > 0) player.physics.vx = 0; }
       if (player.physics.y < DUEL_ARENA.minY) { player.physics.y = DUEL_ARENA.minY; if (player.physics.vy < 0) player.physics.vy = 0; }
       if (player.physics.y > DUEL_ARENA.maxY) { player.physics.y = DUEL_ARENA.maxY; if (player.physics.vy > 0) player.physics.vy = 0; }
+    }
+    // Dash Fantasma: invisível de verdade por 3s; dano/colisão não revelam antes.
+    if (dashReady && player.physics.dashTime > 0 && player.cards.includes('dashInvis')) {
+      player.invisible = 3;
     }
     if (input.shoot && player.reloading <= 0 && player.ammo > 0) {
       player.shooting = true;
@@ -617,7 +621,6 @@ export class Room {
         }
       } else {
         player.flameTick = 0;
-    player.invisible = 0;
       }
     } else if (
       input.shoot &&
@@ -891,7 +894,17 @@ export class Room {
 
       let explode = false;
 
-      if (
+      const owner = this.players.get(grenade.owner);
+      if (owner?.inDuel) {
+        if (
+          grenade.x < DUEL_ARENA.minX ||
+          grenade.y < DUEL_ARENA.minY ||
+          grenade.x > DUEL_ARENA.maxX ||
+          grenade.y > DUEL_ARENA.maxY
+        ) {
+          explode = true;
+        }
+      } else if (
         grenade.x < ARENA.inset ||
         grenade.y < ARENA.inset ||
         grenade.x > ARENA.width - ARENA.inset ||
@@ -1067,7 +1080,6 @@ export class Room {
         player.reloading = 0;
         player.fireCooldown = 0;
         player.flameTick = 0;
-    player.invisible = 0;
 
         this.emit({
           type: 'dropPickup',
@@ -1451,23 +1463,29 @@ export class Room {
 
       if (hitT < 1) continue;
       if (bullet.life <= 0) continue;
-      if (bullet.x < 0 || bullet.x > ARENA.width) {
+      const bulletOwner = this.players.get(bullet.owner);
+      const inDuel = bulletOwner?.inDuel === true;
+      const minBX = inDuel ? DUEL_ARENA.minX : 0;
+      const maxBX = inDuel ? DUEL_ARENA.maxX : ARENA.width;
+      const minBY = inDuel ? DUEL_ARENA.minY : 0;
+      const maxBY = inDuel ? DUEL_ARENA.maxY : ARENA.height;
+      if (bullet.x < minBX || bullet.x > maxBX) {
         if (bullet.ricochets > 0) {
           bullet.vx *= -1;
           bullet.angle = Math.atan2(bullet.vy, bullet.vx);
           bullet.ricochets -= 1;
-          bullet.x = bullet.x < 0 ? 0 : ARENA.width;
+          bullet.x = bullet.x < minBX ? minBX : maxBX;
           if (bullet.life > 0) survivors.push(bullet);
           continue;
         }
         continue;
       }
-      if (bullet.y < 0 || bullet.y > ARENA.height) {
+      if (bullet.y < minBY || bullet.y > maxBY) {
         if (bullet.ricochets > 0) {
           bullet.vy *= -1;
           bullet.angle = Math.atan2(bullet.vy, bullet.vx);
           bullet.ricochets -= 1;
-          bullet.y = bullet.y < 0 ? 0 : ARENA.height;
+          bullet.y = bullet.y < minBY ? minBY : maxBY;
           if (bullet.life > 0) survivors.push(bullet);
           continue;
         }
@@ -1614,6 +1632,7 @@ export class Room {
       id: drop.id,
       x: round(drop.x),
       y: round(drop.y),
+      weapon: drop.weapon,
     }));
 
     const powerups: NetPowerup[] = this.powerupSpawns

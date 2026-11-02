@@ -1,4 +1,4 @@
-import { ARENA, MOVE, PLAYER, TICK_DT } from './constants.js';
+import { ARENA, DUEL_ARENA, MOVE, PLAYER, TICK_DT } from './constants.js';
 import { OBSTACLES } from './map.js';
 import { clamp, normalizeAngle } from './math.js';
 import type { Obstacle, PlayerInput, PlayerPhysics } from './types.js';
@@ -46,7 +46,37 @@ function resolveObstacles(physics: PlayerPhysics, obstacles: readonly Obstacle[]
   }
 }
 
+function inDuelRegion(x: number, y: number): boolean {
+  // Duelistas vivem off-map (além de 2400x1600); qualquer posição fora do mapa
+  // normal ou dentro do ringue usa o clamp do duelo.
+  if (x > ARENA.width || y > ARENA.height) return true;
+  return (
+    x >= DUEL_ARENA.minX - 100 &&
+    x <= DUEL_ARENA.maxX + 100 &&
+    y >= DUEL_ARENA.minY - 100 &&
+    y <= DUEL_ARENA.maxY + 100
+  );
+}
+
 function resolveBounds(physics: PlayerPhysics): void {
+  if (inDuelRegion(physics.x, physics.y)) {
+    if (physics.x < DUEL_ARENA.minX) {
+      physics.x = DUEL_ARENA.minX;
+      if (physics.vx < 0) physics.vx = 0;
+    } else if (physics.x > DUEL_ARENA.maxX) {
+      physics.x = DUEL_ARENA.maxX;
+      if (physics.vx > 0) physics.vx = 0;
+    }
+    if (physics.y < DUEL_ARENA.minY) {
+      physics.y = DUEL_ARENA.minY;
+      if (physics.vy < 0) physics.vy = 0;
+    } else if (physics.y > DUEL_ARENA.maxY) {
+      physics.y = DUEL_ARENA.maxY;
+      if (physics.vy > 0) physics.vy = 0;
+    }
+    return;
+  }
+
   const minX = ARENA.inset + PLAYER.radius;
   const maxX = ARENA.width - ARENA.inset - PLAYER.radius;
   const minY = ARENA.inset + PLAYER.radius;

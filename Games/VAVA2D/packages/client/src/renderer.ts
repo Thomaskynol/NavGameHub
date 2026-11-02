@@ -39,6 +39,7 @@ export interface RenderDrop {
   id: number;
   x: number;
   y: number;
+  weapon?: string;
 }
 
 export interface RenderPowerup {
@@ -269,7 +270,14 @@ export class Renderer {
     }
 
     this.drawFence();
-    this.drawDuelRing(frame.duelActive);
+    if (frame.duelActive) {
+      // Ringue off-map: só existe visualmente durante o duelo.
+      ctx.save();
+      ctx.fillStyle = this.soilPattern ?? '#655039';
+      ctx.fillRect(DUEL_ARENA.minX - 120, DUEL_ARENA.minY - 120, DUEL_ARENA.maxX - DUEL_ARENA.minX + 240, DUEL_ARENA.maxY - DUEL_ARENA.minY + 240);
+      ctx.restore();
+      this.drawDuelRing(true);
+    }
 
     for (const obstacle of obstaclesByDepth) {
       if (
@@ -535,7 +543,8 @@ export class Renderer {
       anim.x = player.x;
       anim.y = player.y;
       const speed = distance / dt;
-      if (speed > 520) {
+      // Rastro do dash revelaria o fantasma: invisível alheio não deixa rastro.
+      if (speed > 520 && !(player.invisible && !player.isSelf)) {
         this.drawDashTrail(player, anim);
       }
     }
@@ -562,7 +571,8 @@ export class Renderer {
 
   private drawPlayers(frame: RenderFrame): void {
     const ctx = this.ctx;
-    const alive = frame.players.filter((player) => player.alive);
+    // Invisível alheio não renderiza (nem sombra, arma ou nome); hitbox intacta no servidor.
+    const alive = frame.players.filter((player) => player.alive && !(player.invisible && !player.isSelf));
 
     for (const player of alive) {
       ctx.save();
@@ -593,7 +603,8 @@ export class Renderer {
     ctx.save();
     ctx.translate(player.x, player.y);
     ctx.scale(player.scale || 1, player.scale || 1);
-    if (player.invisible) ctx.globalAlpha = 0.25;
+    // Dono se vê transparente (~40%) para saber que está invisível.
+    if (player.invisible && player.isSelf) ctx.globalAlpha = 0.4;
 
     if (player.protected) {
       const pulse = 0.55 + Math.sin(frame.now * 0.009) * 0.2;
@@ -942,26 +953,47 @@ export class Renderer {
   private drawPowerups(frame: RenderFrame): void {
     const ctx = this.ctx;
     ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     for (const powerup of frame.powerups ?? []) {
       const color = this.powerupColor(powerup.type);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.beginPath();
-      ctx.ellipse(powerup.x + 2, powerup.y + 3, 12, 9, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(powerup.x + 2, powerup.y + 3, 13, 10, 0.3, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = color;
-      ctx.strokeStyle = 'rgba(10, 14, 8, 0.7)';
-      ctx.lineWidth = 2;
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#10180e';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(powerup.x, powerup.y, 12, 0, Math.PI * 2);
+      ctx.arc(powerup.x, powerup.y, 13, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
 
-      ctx.fillStyle = '#10180e';
-      ctx.font = '700 10px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(this.powerupLabel(powerup.type), powerup.x, powerup.y);
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = color;
+      ctx.font = '700 12px ui-monospace, monospace';
+      ctx.fillText(this.powerupLabel(powerup.type), powerup.x, powerup.y - 1);
+      ctx.restore();
+
+      const tag = this.powerupTag(powerup.type);
+      ctx.font = '700 8px ui-monospace, monospace';
+      const tw = ctx.measureText(tag).width + 10;
+      ctx.fillStyle = 'rgba(8, 13, 7, 0.85)';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(powerup.x - tw / 2, powerup.y + 15, tw, 13, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.fillText(tag, powerup.x, powerup.y + 22);
     }
     ctx.restore();
   }
@@ -983,15 +1015,30 @@ export class Renderer {
 
   private powerupLabel(type: string): string {
     switch (type) {
-      case 'speed': return 'V';
+      case 'speed': return '»';
       case 'heal': return '+';
-      case 'shield': return 'S';
-      case 'damage': return 'D';
-      case 'cooldown': return 'C';
-      case 'grenade': return 'G';
-      case 'duel': return 'X';
-      case 'giant': return 'B';
-      case 'lifesteal': return 'L';
+      case 'shield': return '◈';
+      case 'damage': return '✸';
+      case 'cooldown': return '∞';
+      case 'grenade': return '●';
+      case 'duel': return '⚔';
+      case 'giant': return '▲';
+      case 'lifesteal': return '♥';
+      default: return '?';
+    }
+  }
+
+  private powerupTag(type: string): string {
+    switch (type) {
+      case 'speed': return 'VEL';
+      case 'heal': return 'VIDA';
+      case 'shield': return 'ESCUDO';
+      case 'damage': return 'DANO';
+      case 'cooldown': return 'TURBO';
+      case 'grenade': return 'GRANADA';
+      case 'duel': return 'DUELO';
+      case 'giant': return 'GIGANTE';
+      case 'lifesteal': return 'SUGA';
       default: return '?';
     }
   }
@@ -999,33 +1046,64 @@ export class Renderer {
   private drawDrops(frame: RenderFrame): void {
     const ctx = this.ctx;
     ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     for (const drop of frame.drops) {
+      const style = this.dropStyle(drop.weapon);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.beginPath();
-      ctx.ellipse(drop.x + 3, drop.y + 4, 13, 10, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(drop.x + 3, drop.y + 4, 14, 11, 0.3, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#d9b35f';
-      ctx.strokeStyle = '#6b4f25';
-      ctx.lineWidth = 2;
+      ctx.save();
+      ctx.shadowColor = style.color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#141a10';
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.roundRect(drop.x - 12, drop.y - 12, 24, 24, 4);
+      ctx.roundRect(drop.x - 13, drop.y - 13, 26, 26, 5);
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
 
-      ctx.fillStyle = '#fff2c4';
-      ctx.font = '700 11px ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('?', drop.x, drop.y);
+      ctx.save();
+      ctx.shadowColor = style.color;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = style.color;
+      ctx.font = '700 13px ui-monospace, monospace';
+      ctx.fillText(style.icon, drop.x, drop.y - 1);
+      ctx.restore();
+
+      ctx.font = '700 8px ui-monospace, monospace';
+      const tw = ctx.measureText(style.tag).width + 10;
+      ctx.fillStyle = 'rgba(8, 13, 7, 0.85)';
+      ctx.strokeStyle = style.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(drop.x - tw / 2, drop.y + 15, tw, 13, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = style.color;
+      ctx.fillText(style.tag, drop.x, drop.y + 22);
     }
     ctx.restore();
+  }
+
+  private dropStyle(weapon: string | undefined): { color: string; icon: string; tag: string } {
+    switch (weapon) {
+      case 'flamethrower': return { color: '#ff8a3c', icon: 'F', tag: 'FOGO' };
+      case 'shotgun': return { color: '#8ed77e', icon: 'S', tag: 'SHOT' };
+      case 'minigun': return { color: '#6fe3dc', icon: 'M', tag: 'MINI' };
+      default: return { color: '#f2d06b', icon: '?', tag: 'ARMA' };
+    }
   }
 
   private drawFlames(frame: RenderFrame): void {
     const ctx = this.ctx;
     for (const player of frame.players) {
       if (!player.alive || player.weapon !== 'flamethrower' || !player.shooting) continue;
+      if (player.invisible && !player.isSelf) continue;
       ctx.save();
       ctx.translate(player.x, player.y);
       ctx.rotate(player.aim);

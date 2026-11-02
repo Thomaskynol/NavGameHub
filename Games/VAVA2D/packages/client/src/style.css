@@ -1277,7 +1277,7 @@ kbd {
 .powerup-toast {
   --toast: var(--accent);
   position: absolute;
-  top: 160px;
+  top: 9%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

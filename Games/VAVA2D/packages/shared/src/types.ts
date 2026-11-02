@@ -74,6 +74,7 @@ export interface NetDrop {
   id: number;
   x: number;
   y: number;
+  weapon?: WeaponType;
 }
 
 export interface NetPowerup {
