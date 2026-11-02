@@ -1264,10 +1264,11 @@ export class Room {
             nearest = target;
           }
         }
-        if (nearest) {
+        if (nearest && nearestDist <= 160_000) {
+          // Homing leve: só curva de perto (~400px) e devagar (0.8 rad/s).
           const desiredAngle = Math.atan2(nearest.physics.y - bullet.y, nearest.physics.x - bullet.x);
           const currentAngle = Math.atan2(bullet.vy, bullet.vx);
-          const turn = 2.5 * dt;
+          const turn = 0.8 * dt;
           const diff = normalizeAngle(desiredAngle - currentAngle);
           const newAngle = currentAngle + Math.max(-turn, Math.min(turn, diff));
           const speed = Math.hypot(bullet.vx, bullet.vy);
