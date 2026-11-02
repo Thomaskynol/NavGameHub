@@ -11,7 +11,7 @@ export type CardType = 'homing' | 'dashShot' | 'weaponCycle' | 'deathGrenade' | 
 
 export type PowerupType = 'speed' | 'heal' | 'shield' | 'damage' | 'cooldown' | 'grenade' | 'duel' | 'giant' | 'lifesteal';
 
-export type ObstacleKind = 'rock' | 'tree';
+export type ObstacleKind = 'rock' | 'tree' | 'wall';
 
 export interface Obstacle {
   id: number;

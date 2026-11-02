@@ -1,4 +1,4 @@
-import { ARENA, DUEL_ARENA, OBSTACLES, PLAYER } from '@vava/shared';
+import { ARENA, DUEL_ARENA, HOUSE, HOUSE_DOORS, HOUSE_WALL_RUNS, OBSTACLES, PLAYER } from '@vava/shared';
 import type { Obstacle } from '@vava/shared';
 import type { Effects } from './effects.js';
 import { mulberry32 } from './rng.js';
@@ -269,6 +269,7 @@ export class Renderer {
       ctx.fill();
     }
 
+    this.drawHouseFloor();
     this.drawFence();
     if (frame.duelActive) {
       // Ringue off-map: só existe visualmente durante o duelo.
@@ -280,6 +281,8 @@ export class Renderer {
     }
 
     for (const obstacle of obstaclesByDepth) {
+      // Paredes da casa: a colisão usa os círculos, o visual é o drawHouseWalls.
+      if (obstacle.kind === 'wall') continue;
       if (
         obstacle.x + obstacle.radius * 1.4 < left ||
         obstacle.x - obstacle.radius * 1.4 > right ||
@@ -294,6 +297,7 @@ export class Renderer {
         this.drawTree(obstacle);
       }
     }
+    this.drawHouseWalls();
   }
 
   private drawFence(): void {
@@ -349,6 +353,98 @@ export class Renderer {
       ctx.beginPath();
       ctx.arc(post.x - 1, post.y - 1, 2.6, 0, Math.PI * 2);
       ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private drawHouseFloor(): void {
+    const ctx = this.ctx;
+    const { x0, y0, x1, y1 } = HOUSE;
+    const w = x1 - x0;
+    const h = y1 - y0;
+    ctx.save();
+    // Sombra do beiral.
+    ctx.fillStyle = 'rgba(8, 12, 6, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(x0 - 8 + 7, y0 - 8 + 9, w + 16, h + 16, 6);
+    ctx.fill();
+    // Chão interno: terra batida, levemente diferente da grama.
+    ctx.fillStyle = '#6e5a36';
+    ctx.beginPath();
+    ctx.roundRect(x0 - 8, y0 - 8, w + 16, h + 16, 6);
+    ctx.fill();
+    ctx.fillStyle = '#655133';
+    ctx.fillRect(x0, y0, w, h);
+    // Tábuas.
+    ctx.strokeStyle = 'rgba(52, 38, 20, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let y = y0 + 26; y < y1; y += 26) {
+      ctx.moveTo(x0 + 4, y);
+      ctx.lineTo(x1 - 4, y);
+    }
+    ctx.stroke();
+    // Contorno do beiral (telhado visto de cima).
+    ctx.strokeStyle = '#3f2d1c';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.roundRect(x0 - 8, y0 - 8, w + 16, h + 16, 6);
+    ctx.stroke();
+    ctx.strokeStyle = '#7b5a38';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(x0 - 8, y0 - 8, w + 16, h + 16, 6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawHouseWalls(): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.lineCap = 'round';
+    // Divisórias primeiro (mais finas), externas por cima nos encontros.
+    for (const pass of [true, false]) {
+      for (const run of HOUSE_WALL_RUNS) {
+        if (run.interior !== pass) continue;
+        ctx.strokeStyle = '#3f2d1c';
+        ctx.lineWidth = run.interior ? 30 : 40;
+        ctx.beginPath();
+        ctx.moveTo(run.x1, run.y1);
+        ctx.lineTo(run.x2, run.y2);
+        ctx.stroke();
+        ctx.strokeStyle = run.interior ? '#6b4c30' : '#7b5a38';
+        ctx.lineWidth = run.interior ? 20 : 28;
+        ctx.beginPath();
+        ctx.moveTo(run.x1, run.y1);
+        ctx.lineTo(run.x2, run.y2);
+        ctx.stroke();
+      }
+    }
+    // Soleiras + batentes nas portas (vãos visíveis).
+    for (const door of HOUSE_DOORS) {
+      const horizontal = door.side === 'N' || door.side === 'S';
+      const fixed =
+        door.side === 'N' ? HOUSE.y0
+        : door.side === 'S' ? HOUSE.y1
+        : door.side === 'W' ? HOUSE.x0
+        : HOUSE.x1;
+      ctx.fillStyle = '#8a6b42';
+      if (horizontal) ctx.fillRect(door.from, fixed - 9, door.to - door.from, 18);
+      else ctx.fillRect(fixed - 9, door.from, 18, door.to - door.from);
+      ctx.fillStyle = '#3f2d1c';
+      for (const edge of [door.from, door.to]) {
+        if (horizontal) {
+          ctx.fillRect(edge - 4, fixed - 13, 8, 26);
+          ctx.fillStyle = '#7b5a38';
+          ctx.fillRect(edge - 2, fixed - 11, 4, 22);
+          ctx.fillStyle = '#3f2d1c';
+        } else {
+          ctx.fillRect(fixed - 13, edge - 4, 26, 8);
+          ctx.fillStyle = '#7b5a38';
+          ctx.fillRect(fixed - 11, edge - 2, 22, 4);
+          ctx.fillStyle = '#3f2d1c';
+        }
+      }
     }
     ctx.restore();
   }

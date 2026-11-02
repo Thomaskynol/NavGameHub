@@ -167,7 +167,8 @@ export const POWERUP = {
     { x: 2000, y: 400 },
     { x: 400, y: 1200 },
     { x: 2000, y: 1200 },
-    { x: 1200, y: 800 },
+    // Era (1200, 800): ficava dentro da casa; recuado para o campo ao sul.
+    { x: 1200, y: 1120 },
     { x: 700, y: 800 },
     { x: 1700, y: 800 },
   ],

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ARENA, PLAYER } from './constants.js';
-import { OBSTACLES } from './map.js';
+import { ARENA, PLAYER, POWERUP } from './constants.js';
+import { HOUSE, OBSTACLES, SPAWN_POINTS } from './map.js';
 import {
   createPlayerPhysics,
+  pointBlockedByObstacle,
   segmentCircleHit,
   stepPlayerPhysics,
 } from './simulation.js';
@@ -94,4 +95,51 @@ test('segmento detecta entrada em círculo', () => {
   assert.equal(segmentCircleHit(0, 0, 10, 0, 5, 0, 2), 0.3);
   assert.equal(segmentCircleHit(0, 0, 10, 0, 0, 0, 1), 0);
   assert.equal(segmentCircleHit(0, 0, 10, 0, 5, 5, 1), null);
+});
+
+test('parede da casa bloqueia jogador fora da porta', () => {
+  const player = createPlayerPhysics(1100, 550, Math.PI / 2);
+  for (let i = 0; i < 120; i += 1) {
+    stepPlayerPhysics(player, input({ move: 2, aim: Math.PI / 2 }));
+  }
+  // Parede norte em y=650 (círculos r22): para em ~613 sem atravessar.
+  assert.ok(player.y < 640 && player.y > 590, `y ${player.y}`);
+});
+
+test('porta da casa deixa o jogador entrar', () => {
+  const player = createPlayerPhysics(1275, 550, Math.PI / 2);
+  for (let i = 0; i < 45; i += 1) {
+    stepPlayerPhysics(player, input({ move: 2, aim: Math.PI / 2 }));
+  }
+  assert.ok(player.y > HOUSE.y0 + 10 && player.y < 900, `y ${player.y}`);
+});
+
+test('bala é barrada pela parede da casa', () => {
+  const wall = OBSTACLES.find(
+    (obstacle) =>
+      obstacle.kind === 'wall' && obstacle.y === HOUSE.y0 && Math.abs(obstacle.x - 1100) < 20,
+  );
+  assert.ok(wall);
+  const t = segmentCircleHit(
+    wall.x,
+    wall.y - 60,
+    wall.x,
+    wall.y + 60,
+    wall.x,
+    wall.y,
+    wall.radius + 3.5,
+  );
+  assert.ok(t !== null && t > 0 && t < 1);
+});
+
+test('spawns de power-up e de jogador ficam fora das paredes', () => {
+  for (const point of POWERUP.spawnPoints) {
+    assert.ok(!pointBlockedByObstacle(point.x, point.y, 20), `powerup (${point.x},${point.y})`);
+  }
+  for (const point of SPAWN_POINTS) {
+    assert.ok(
+      !pointBlockedByObstacle(point.x, point.y, PLAYER.radius),
+      `spawn (${point.x},${point.y})`,
+    );
+  }
 });
