@@ -253,3 +253,103 @@ describe('produção (roll)', () => {
     }
   });
 });
+
+describe('duplo 8 de trigo (duas casas, uma em cada hex)', () => {
+  /**
+   * Premissa do relato: DOIS hexes fields com nº 8 + 1 assentamento adjacente a cada.
+   * O motor acumula por (recurso, jogador) em todos os hexes producentes, então com
+   * banco cheio e sem ladrão o dono recebe 2 grãos. Regressão do relato "saiu 8 e
+   * veio só 1 trigo": com este estado o motor paga 2 — 1 grão só é correto com
+   * ladrão num dos hexes ou escassez do banco (testes abaixo).
+   */
+  function doubleWheat8(seed = 'duplo8'): { s: GameState; hexA: string; hexB: string; vA: string; vB: string } {
+    let s = finishSetup(newGame(3, seed), makeRng(seed));
+    s = resetBoard(s);
+    const h1 = s.board.hexes[0];
+    const h2 = s.board.hexes.find((h) => h.id !== h1.id && !(s.board.hexNeighbors[h1.id] ?? []).includes(h.id));
+    if (!h2) throw new Error('sem par de hexes não-adjacentes');
+    h1.terrain = 'fields';
+    h1.number = 8;
+    h2.terrain = 'fields';
+    h2.number = 8;
+    for (const h of s.board.hexes) {
+      if (h.id !== h1.id && h.id !== h2.id && h.number === 8) h.number = null;
+    }
+    // Ladrão longe dos dois 8s (deserto do próprio tabuleiro).
+    s.robberHexId = s.board.hexes.find((h) => h.terrain === 'desert')?.id ?? s.robberHexId;
+    const v1s = hexVertices(s, h1.id);
+    const v2s = hexVertices(s, h2.id);
+    const shared = new Set(v1s.filter((v) => v2s.includes(v)));
+    const vA = v1s.find((v) => !shared.has(v)) ?? v1s[0];
+    const vB = v2s.find((v) => !shared.has(v) && v !== vA) ?? v2s.find((v) => v !== vA)!;
+    addBuilding(s, 'p0', vA, 'settlement');
+    addBuilding(s, 'p0', vB, 'settlement');
+    return { s, hexA: h1.id, hexB: h2.id, vA, vB };
+  }
+
+  it('banco cheio e sem ladrão: 2 grãos', () => {
+    const { s } = doubleWheat8();
+    setBank(s, { grain: 19 });
+    const before = s.players.find((p) => p.id === 'p0')!.resources.grain;
+    const r = roll(s, 8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources.grain).toBe(before + 2);
+    expect(r.state.bank.grain).toBe(17);
+  });
+
+  it('board de seed real com dois 8s de trigo naturais: 2 grãos', () => {
+    // seed-39 gera dois fields com nº 8 não-adjacentes (cobertura "board real vs teste").
+    let s = finishSetup(newGame(3, 'seed-39'), makeRng('seed-39'));
+    s = resetBoard(s);
+    const wheat8 = s.board.hexes.filter((h) => h.terrain === 'fields' && h.number === 8);
+    expect(wheat8.length).toBe(2);
+    const [hA, hB] = wheat8;
+    expect(s.board.hexNeighbors[hA.id] ?? []).not.toContain(hB.id); // 6/8 nunca adjacentes
+    const vA = hexVertices(s, hA.id)[0];
+    const vB = hexVertices(s, hB.id).find((v) => v !== vA)!;
+    addBuilding(s, 'p0', vA, 'settlement');
+    addBuilding(s, 'p0', vB, 'settlement');
+    setBank(s, { grain: 19 });
+    expect(s.board.vertexHexes[vA]).toContain(hA.id);
+    expect(s.board.vertexHexes[vB]).toContain(hB.id);
+    const r = roll(s, 8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources.grain).toBe(2);
+  });
+
+  it('ladrão num dos 8s: 1 grão (correto — hex bloqueado não produz)', () => {
+    const { s, hexA, hexB } = doubleWheat8();
+    expect(hexA).not.toBe(hexB);
+    s.robberHexId = hexA; // bloqueia um dos dois hexes 8
+    setBank(s, { grain: 19 });
+    const r = roll(s, 8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources.grain).toBe(1);
+  });
+
+  it('escassez com beneficiário único (banco 1, direito a 2): 1 grão (correto — exceção do único)', () => {
+    const { s } = doubleWheat8();
+    setBank(s, { grain: 1 });
+    const r = roll(s, 8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources.grain).toBe(1);
+    expect(r.state.bank.grain).toBe(0);
+  });
+
+  it('escassez com 2+ beneficiários no mesmo recurso: ninguém recebe (correto — regra oficial)', () => {
+    const { s, hexB } = doubleWheat8();
+    // p1 também produz grão no 8 (direito a 1); total devido 3 > banco 2 => ninguém recebe grão.
+    addBuilding(s, 'p1', hexVertices(s, hexB).find((v) => !(s.buildings.some((b) => b.vertexId === v)))!, 'settlement');
+    setBank(s, { grain: 2 });
+    const r = roll(s, 8);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources.grain).toBe(0);
+    expect(r.state.players.find((p) => p.id === 'p1')!.resources.grain).toBe(0);
+    expect(r.state.bank.grain).toBe(2);
+  });
+});
