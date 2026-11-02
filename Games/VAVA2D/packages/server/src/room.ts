@@ -18,6 +18,7 @@ import {
   TICK_DT,
   createPlayerPhysics,
   distanceSq,
+  explosionBlockedByWall,
   segmentCircleHit,
   normalizeAngle,
   pointBlockedByObstacle,
@@ -974,6 +975,10 @@ export class Room {
       const dx = player.physics.x - grenade.x;
       const dy = player.physics.y - grenade.y;
       if (dx * dx + dy * dy > radiusSq) continue;
+      // Parede da casa entre a explosão e o alvo blinda (vestíbulo contém).
+      if (explosionBlockedByWall(grenade.x, grenade.y, player.physics.x, player.physics.y)) {
+        continue;
+      }
 
       const damage = Math.round(GRENADE.damage * (shooter?.damageBoost && shooter.damageBoost > 0 ? 1.5 : 1));
       player.health = Math.max(0, player.health - damage);

@@ -1274,6 +1274,42 @@ kbd {
   transition: width 0.2s linear;
 }
 
+.cards {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.card-slot {
+  --card: #9fae95;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border: 1px solid var(--card);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--card) 45%, transparent);
+  cursor: help;
+}
+
+.card-slot.empty {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: none;
+  color: rgba(159, 174, 149, 0.35);
+  cursor: default;
+}
+
+.card-symbol {
+  color: var(--card);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 0 8px var(--card);
+}
+
 .powerup-toast {
   --toast: var(--accent);
   position: absolute;

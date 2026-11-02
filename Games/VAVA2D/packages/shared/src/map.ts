@@ -17,28 +17,39 @@ const obstacleData = [
 ] as const;
 
 /**
- * Casa do Campo Aberto: retângulo 400x300 no centro da arena, com 5 portas
- * de 100px (uma por lado + uma extra no sul) e 2 divisórias internas formando
- * 3 cômodos. A colisão reaproveita os círculos de sempre (kind 'wall'); o
- * renderer desenha as paredes por cima a partir de HOUSE_WALL_RUNS.
+ * Casa do Campo Aberto: retângulo 560x420 no centro da arena, com 4 portas
+ * de 100px (N/S centradas com vãos espelhados + par L/O desencontrado de
+ * propósito, sem túnel reto de um lado ao outro) e 2 divisórias internas
+ * formando 3 cômodos, mais 2 vestíbulos em L logo após as portas N/S: quem
+ * entra vira de lado para sair, e a granada jogada de fora em linha reta
+ * morre na parede cheia do fundo (explosão contida no vestíbulo).
+ * A colisão reaproveita os círculos de sempre (kind 'wall'); o renderer
+ * desenha as paredes por cima a partir de HOUSE_WALL_RUNS.
  */
 export const HOUSE = {
-  x0: 1000,
-  y0: 650,
-  x1: 1400,
-  y1: 950,
+  x0: 920,
+  y0: 590,
+  x1: 1480,
+  y1: 1010,
   wallRadius: 22,
   doors: [
-    { side: 'N', at: 1275, width: 100 },
-    { side: 'S', at: 1275, width: 100 },
-    { side: 'S', at: 1060, width: 100 },
-    { side: 'E', at: 700, width: 100 },
-    { side: 'W', at: 800, width: 100 },
+    { side: 'N', at: 1200, width: 100 },
+    { side: 'S', at: 1200, width: 100 },
+    { side: 'E', at: 860, width: 100 },
+    { side: 'W', at: 740, width: 100 },
   ],
   // Divisórias internas: segmentos com vãos de passagem (coordenada do eixo).
   dividers: [
-    { x1: 1150, y1: 650, x2: 1150, y2: 950, gaps: [{ from: 770, to: 850 }] },
-    { x1: 1150, y1: 800, x2: 1400, y2: 800, gaps: [{ from: 1240, to: 1320 }] },
+    { x1: 920, y1: 800, x2: 1480, y2: 800, gaps: [{ from: 950, to: 1030 }] },
+    { x1: 1040, y1: 800, x2: 1040, y2: 1010, gaps: [{ from: 860, to: 940 }] },
+    // Vestíbulo N em L: entra pela porta N, sai pela lateral oeste.
+    { x1: 1130, y1: 590, x2: 1130, y2: 700, gaps: [{ from: 615, to: 695 }] },
+    { x1: 1270, y1: 590, x2: 1270, y2: 700, gaps: [] },
+    { x1: 1130, y1: 700, x2: 1270, y2: 700, gaps: [] },
+    // Vestíbulo S em L: entra pela porta S, sai pela lateral leste.
+    { x1: 1130, y1: 900, x2: 1130, y2: 1010, gaps: [] },
+    { x1: 1270, y1: 900, x2: 1270, y2: 1010, gaps: [{ from: 905, to: 985 }] },
+    { x1: 1130, y1: 900, x2: 1270, y2: 900, gaps: [] },
   ],
 } as const;
 

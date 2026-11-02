@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ARENA, PLAYER, POWERUP } from './constants.js';
-import { HOUSE, OBSTACLES, SPAWN_POINTS } from './map.js';
+import { ARENA, GRENADE, PLAYER, POWERUP } from './constants.js';
+import { HOUSE, HOUSE_DOORS, OBSTACLES, SPAWN_POINTS } from './map.js';
 import {
   createPlayerPhysics,
+  explosionBlockedByWall,
   pointBlockedByObstacle,
   segmentCircleHit,
   stepPlayerPhysics,
@@ -98,20 +99,52 @@ test('segmento detecta entrada em círculo', () => {
 });
 
 test('parede da casa bloqueia jogador fora da porta', () => {
-  const player = createPlayerPhysics(1100, 550, Math.PI / 2);
+  const player = createPlayerPhysics(1100, 490, Math.PI / 2);
   for (let i = 0; i < 120; i += 1) {
     stepPlayerPhysics(player, input({ move: 2, aim: Math.PI / 2 }));
   }
-  // Parede norte em y=650 (círculos r22): para em ~613 sem atravessar.
-  assert.ok(player.y < 640 && player.y > 590, `y ${player.y}`);
+  // Parede norte em y=590 (círculos r22): para em ~553 sem atravessar.
+  assert.ok(player.y < 580 && player.y > 520, `y ${player.y}`);
 });
 
-test('porta da casa deixa o jogador entrar', () => {
-  const player = createPlayerPhysics(1275, 550, Math.PI / 2);
+test('porta da casa deixa o jogador entrar (para no vestíbulo)', () => {
+  const player = createPlayerPhysics(1200, 490, Math.PI / 2);
   for (let i = 0; i < 45; i += 1) {
     stepPlayerPhysics(player, input({ move: 2, aim: Math.PI / 2 }));
   }
-  assert.ok(player.y > HOUSE.y0 + 10 && player.y < 900, `y ${player.y}`);
+  // Entra pela porta N (y=590) e para na parede cheia do fundo do vestíbulo.
+  assert.ok(player.y > HOUSE.y0 + 10 && player.y < 690, `y ${player.y}`);
+});
+
+test('paredes externas não têm fresta e os vãos das portas abrem', () => {
+  const gapsOf = (side: string): Array<{ from: number; to: number }> =>
+    HOUSE_DOORS.filter((door) => door.side === side).map((door) => ({
+      from: door.from,
+      to: door.to,
+    }));
+  const sweep = (
+    fixed: number,
+    from: number,
+    to: number,
+    horizontal: boolean,
+    gaps: Array<{ from: number; to: number }>,
+  ): void => {
+    for (let p = from; p <= to; p += 10) {
+      const x = horizontal ? p : fixed;
+      const y = horizontal ? fixed : p;
+      const inGap = gaps.some((gap) => p > gap.from && p < gap.to);
+      if (inGap) {
+        const core = gaps.some((gap) => p > gap.from + 30 && p < gap.to - 30);
+        if (core) assert.ok(!pointBlockedByObstacle(x, y, 0), `vão fechado em ${x},${y}`);
+      } else {
+        assert.ok(pointBlockedByObstacle(x, y, 0), `furo na parede em ${x},${y}`);
+      }
+    }
+  };
+  sweep(HOUSE.y0, HOUSE.x0, HOUSE.x1, true, gapsOf('N'));
+  sweep(HOUSE.y1, HOUSE.x0, HOUSE.x1, true, gapsOf('S'));
+  sweep(HOUSE.x0, HOUSE.y0, HOUSE.y1, false, gapsOf('W'));
+  sweep(HOUSE.x1, HOUSE.y0, HOUSE.y1, false, gapsOf('E'));
 });
 
 test('bala é barrada pela parede da casa', () => {
@@ -142,4 +175,35 @@ test('spawns de power-up e de jogador ficam fora das paredes', () => {
       `spawn (${point.x},${point.y})`,
     );
   }
+});
+
+test('vestíbulo N contém explosão: interior fora do raio e atrás de parede', () => {
+  // Granada jogada de fora morre no fundo do vestíbulo (~640); o interior
+  // principal (900) fica além do raio e com a parede cheia no caminho.
+  const dist = Math.hypot(1200 - 1200, 900 - 640);
+  assert.ok(dist > GRENADE.explosionRadius, `dist ${dist}`);
+  assert.ok(explosionBlockedByWall(1200, 640, 1200, 900));
+});
+
+test('vestíbulo S contém explosão: interior fora do raio e atrás de parede', () => {
+  const dist = Math.hypot(1200 - 1200, 700 - 960);
+  assert.ok(dist > GRENADE.explosionRadius, `dist ${dist}`);
+  assert.ok(explosionBlockedByWall(1200, 960, 1200, 700));
+});
+
+test('porta aberta não blinda granada lançada de fora para o vestíbulo', () => {
+  assert.ok(!explosionBlockedByWall(1200, 500, 1200, 640));
+  assert.ok(!explosionBlockedByWall(1200, 1100, 1200, 960));
+});
+
+test('saídas laterais dos vestíbulos são passáveis', () => {
+  assert.ok(!pointBlockedByObstacle(1110, 650, PLAYER.radius), 'saída N');
+  assert.ok(!pointBlockedByObstacle(1290, 950, PLAYER.radius), 'saída S');
+});
+
+test('pedra e árvore não blindam explosão (só parede da casa)', () => {
+  const rock = OBSTACLES.find((obstacle) => obstacle.id === 0);
+  assert.ok(rock && rock.kind === 'rock');
+  // Segmento atravessa a pedra de um lado ao outro: sem parede, sem blindagem.
+  assert.ok(!explosionBlockedByWall(rock.x, rock.y - rock.radius - 30, rock.x, rock.y + rock.radius + 30));
 });

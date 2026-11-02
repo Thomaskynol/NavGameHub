@@ -199,3 +199,28 @@ export function pointBlockedByObstacle(
   }
   return false;
 }
+
+/**
+ * Explosão contida no vestíbulo: há parede da casa entre a explosão e o
+ * alvo? Só círculos kind 'wall' blindam; mato/pedra do campo não bloqueiam
+ * dano em área. A parede onde a granada encostou (origem dentro do círculo)
+ * não conta, senão o impacto blindaria todo mundo.
+ */
+export function explosionBlockedByWall(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  obstacles: readonly Obstacle[] = OBSTACLES,
+): boolean {
+  for (const obstacle of obstacles) {
+    if (obstacle.kind !== 'wall') continue;
+    const sx = ax - obstacle.x;
+    const sy = ay - obstacle.y;
+    if (sx * sx + sy * sy < obstacle.radius * obstacle.radius) continue;
+    if (segmentCircleHit(ax, ay, bx, by, obstacle.x, obstacle.y, obstacle.radius) !== null) {
+      return true;
+    }
+  }
+  return false;
+}

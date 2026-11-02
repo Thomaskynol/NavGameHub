@@ -1,5 +1,5 @@
-import { GRENADE, PISTOL, PLAYER, WEAPONS } from '@vava/shared';
-import type { Snapshot } from '@vava/shared';
+import { CARD_INFO, GRENADE, PISTOL, PLAYER, WEAPONS } from '@vava/shared';
+import type { CardType, Snapshot } from '@vava/shared';
 
 interface MenuHandlers {
   create: (name: string) => void;
@@ -13,6 +13,23 @@ function byId<T extends HTMLElement>(id: string): T {
   if (!element) throw new Error(`Elemento #${id} não encontrado.`);
   return element as T;
 }
+
+// Símbolo próprio por carta (glifo de texto, sem CDN), estilo efeito de
+// status: ícone + cor da carta, tooltip com título e descrição.
+const CARD_META: Record<CardType, { symbol: string; color: string }> = {
+  homing: { symbol: '◎', color: '#6fe3dc' },
+  dashShot: { symbol: '»', color: '#f4a259' },
+  weaponCycle: { symbol: '⇄', color: '#a78bfa' },
+  deathGrenade: { symbol: '✸', color: '#e76f51' },
+  powerupDuration: { symbol: '◷', color: '#74c69d' },
+  ricochet: { symbol: '↩', color: '#5aa9e6' },
+  slowKnockback: { symbol: '◉', color: '#f2d06b' },
+  wallBounce: { symbol: '◧', color: '#4dd0c8' },
+  chargedShot: { symbol: 'ϟ', color: '#ffd27d' },
+  dashInvis: { symbol: '◌', color: '#ef7ba8' },
+};
+
+const MAX_CARDS = 3;
 
 // Copy curta PT-BR do toast de power-up (revisão de texto sem mexer no visual).
 const POWERUP_COPY: Record<string, { title: string; desc: string; color: string }> = {
@@ -42,6 +59,7 @@ export class Hud {
   private readonly healthValue = byId('health-value');
   private readonly dashFill = byId('dash-fill');
   private readonly buffs = byId('buffs');
+  private readonly cards = byId('cards');
   private readonly grenadeFill = byId('grenade-fill');
   private readonly grenadeValue = byId('grenade-value');
   private readonly ammoPips = byId('ammo-pips');
@@ -76,6 +94,7 @@ export class Hud {
   private readonly powerupToastDesc = byId('powerup-toast-desc');
   private powerupToastTimeout: number | null = null;
   private buffChips = new Map<string, { root: HTMLElement; time: HTMLElement; bar: HTMLElement }>();
+  private lastCards = '';
 
   private currentRoomCode = '';
   private lastLeaderboard = '';
@@ -167,6 +186,8 @@ export class Hud {
     this.hidePowerupToast();
     this.buffs.replaceChildren();
     this.buffChips.clear();
+    this.cards.replaceChildren();
+    this.lastCards = '';
     this.lastLeaderboard = '';
     this.lastFinalScores = '';
     this.lastAmmo = -1;
@@ -353,6 +374,7 @@ export class Hud {
     this.updateLeaderboard(snapshot, playerId);
     this.updateWaiting(snapshot);
     this.updateCards(snapshot);
+    this.updateCardSlots(snapshot.you.cards ?? []);
     this.updateDeath(snapshot, you.alive);
     this.updateMatchEnd(snapshot);
     this.updateBuffs(snapshot.you);
@@ -582,6 +604,37 @@ export class Hud {
     if (selecting && progress) {
       this.cardBannerText.textContent =
         `Escolhendo cartas ${progress.chose}/${progress.total} · ${progress.remaining}s`;
+    }
+  }
+
+  /** Slots das cartas atuais (até 3), abaixo dos buffs; vazio apagado. */
+  private updateCardSlots(cards: CardType[]): void {
+    const signature = cards.join(',');
+    if (signature === this.lastCards) return;
+    this.lastCards = signature;
+
+    this.cards.replaceChildren();
+    for (let i = 0; i < MAX_CARDS; i += 1) {
+      const card = cards[i];
+      const slot = document.createElement('div');
+      slot.className = 'card-slot';
+      if (!card) {
+        slot.classList.add('empty');
+        const dash = document.createElement('span');
+        dash.textContent = '·';
+        slot.append(dash);
+        this.cards.append(slot);
+        continue;
+      }
+      const meta = CARD_META[card];
+      const info = CARD_INFO[card];
+      slot.style.setProperty('--card', meta.color);
+      slot.title = `${info.title} — ${info.description}`;
+      const symbol = document.createElement('span');
+      symbol.className = 'card-symbol';
+      symbol.textContent = meta.symbol;
+      slot.append(symbol);
+      this.cards.append(slot);
     }
   }
 
