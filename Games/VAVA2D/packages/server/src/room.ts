@@ -1393,8 +1393,9 @@ export class Room {
     }
 
     if (bullet.slow) {
-      const kx = Math.cos(bullet.angle) * 150;
-      const ky = Math.sin(bullet.angle) * 150;
+      // Impulso 500: desloca ~40px antes do decel zerar (~9 ticks), sem canal novo.
+      const kx = Math.cos(bullet.angle) * 500;
+      const ky = Math.sin(bullet.angle) * 500;
       target.physics.vx += kx;
       target.physics.vy += ky;
     }
