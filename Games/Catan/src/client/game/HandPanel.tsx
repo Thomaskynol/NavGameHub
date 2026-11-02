@@ -3,7 +3,7 @@ import type { DevCardKind, ResourceKind } from '../../shared/constants';
 import { COSTS, RESOURCE_KINDS } from '../../shared/constants';
 import type { GameView } from '../../shared/protocol';
 import { bestBankRate } from '../board/legalClient';
-import { DEV_DESC, DEV_LABEL, ResourceIcon } from '../ui/icons';
+import { DEV_DESC, DEV_LABEL, RESOURCE_LABEL, ResourceIcon } from '../ui/icons';
 
 const DEV_STATE_HINT: Record<string, string> = {
   boughtThisTurn: 'Comprada neste turno — só vale a partir do próximo.',
@@ -36,7 +36,7 @@ export function CostIcons({ cost, showQty = true }: { cost: Partial<Record<Resou
   return (
     <span className="cost-icons">
       {RESOURCE_KINDS.filter((k) => cost[k]).map((k) => (
-        <span key={k} className="row" style={{ gap: 2 }} title={k}>
+        <span key={k} className="row" style={{ gap: 2 }} title={`${RESOURCE_LABEL[k]} ×${cost[k]}`}>
           <ResourceIcon kind={k} size={14} />
           {showQty && <b>×{cost[k]}</b>}
         </span>
@@ -87,11 +87,18 @@ export default function HandPanel({ view, youId }: { view: GameView; youId: stri
 
       <div className="hand-sec">
         <h3>Recursos</h3>
-        <div className="res-row">
+        <div className="res-list">
           {RESOURCE_KINDS.map((k) => (
-            <span key={k} className="res-chip" title={k}>
-              <ResourceIcon kind={k} />
-              <span className="cnt">{res[k]}</span>
+            <span
+              key={k}
+              className={`res-chip${(res[k] ?? 0) === 0 ? ' empty' : ''}`}
+              title={`${RESOURCE_LABEL[k]}: ${res[k]}`}
+            >
+              <ResourceIcon kind={k} size={20} />
+              <span className="res-name">{RESOURCE_LABEL[k]}</span>
+              <span className="cnt" aria-label={`${res[k]} cartas de ${RESOURCE_LABEL[k]}`}>
+                {res[k]}
+              </span>
             </span>
           ))}
         </div>
