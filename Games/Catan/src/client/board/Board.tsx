@@ -1,9 +1,11 @@
 // Tabuleiro SVG: ilha de 19 hexes, mar, portos, peças, ladrão, destaques legais.
 // Pan (arrastar) + zoom (roda / botões). Arte vetorial original.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { EdgeId, HexId, PlayerColor, PlayerId, VertexId } from '../../shared/constants';
+import type { EdgeId, HexId, PlayerColor, PlayerId, ResourceKind, TerrainKind, VertexId } from '../../shared/constants';
+import { TERRAIN_RESOURCE } from '../../shared/constants';
 import type { GameView, PublicPlayerView } from '../../shared/protocol';
 import { hexPathPoints, parseEdgeId, type GeoHex, type IslandGeometry } from './geometry';
+import { RESOURCE_LABEL, ResourceIcon } from '../ui/icons';
 import type { LegalTargets } from './legalClient';
 
 export type BoardMode =
@@ -54,6 +56,42 @@ const RESOURCE_TINT: Record<string, string> = {
   grain: '#e0b63e',
   ore: '#8d9098',
 };
+
+// Recurso exibido por terreno — fonte oficial TERRAIN_RESOURCE (shared/constants.ts),
+// conferido: hills→brick, forest→lumber, pasture→wool, fields→grain,
+// mountains→ore, desert→nada. Nenhuma chave trocada no display.
+// Nomes em PT seguem RESOURCE_LABEL (ui/icons.tsx) para não divergir da mão/banco.
+function terrainResource(t: TerrainKind): ResourceKind | null {
+  return t === 'desert' ? null : TERRAIN_RESOURCE[t];
+}
+
+function HexBadge({ x, y, terrain }: { x: number; y: number; terrain: TerrainKind }) {
+  const res = terrainResource(terrain);
+  const name = res ? RESOURCE_LABEL[res] : 'Deserto';
+  const tint = res ? (RESOURCE_TINT[res] ?? '#8a6d3b') : '#c0a46a';
+  const cy = y - 30.5;
+  return (
+    <g pointerEvents="none" aria-hidden="true">
+      <rect x={x - 37} y={cy - 8.5} width={74} height={17} rx={8.5} fill="rgba(18,11,6,0.78)" stroke={tint} strokeWidth={1.2} />
+      {res && (
+        <g transform={`translate(${x - 30} ${cy - 6})`}>
+          <ResourceIcon kind={res} size={12} />
+        </g>
+      )}
+      <text
+        x={res ? x - 15 : x}
+        y={cy + 3.8}
+        textAnchor={res ? 'start' : 'middle'}
+        fontSize={10.5}
+        fontWeight={700}
+        fontFamily="Georgia, serif"
+        fill="#f3e6c8"
+      >
+        {name}
+      </text>
+    </g>
+  );
+}
 
 function pipsFor(n: number): number {
   return Math.max(1, 6 - Math.abs(n - 7));
@@ -345,8 +383,10 @@ export default function Board({
             const st = TERRAIN_STYLE[h.tile.terrain] ?? TERRAIN_STYLE.desert;
             const legalHex = isLegalHex(h.id);
             const isRobber = view.board.robberHexId === h.id;
+            const produced = terrainResource(h.tile.terrain as TerrainKind);
             return (
               <g key={h.id} className={`board-hex${legalHex ? ' robber-target' : ''}`}>
+                <title>{`${st.label} — ${produced ? `produz ${RESOURCE_LABEL[produced]}` : 'não produz recurso'}`}</title>
                 <polygon
                   points={hexPathPoints(h.x, h.y)}
                   fill={st.fill}
@@ -375,6 +415,7 @@ export default function Board({
                   onClick={() => handleHex(h.id)}
                 />
                 {h.tile.number != null && <Token x={h.x} y={h.y - 6} number={h.tile.number} />}
+                <HexBadge x={h.x} y={h.y} terrain={h.tile.terrain as TerrainKind} />
                 {isRobber && (
                   <g key={`robber-${view.board.robberHexId}`} className="robber-piece" transform={`translate(${h.x} ${h.y + 22})`} pointerEvents="none" filter="url(#robber-shadow)">
                     <ellipse cx={0} cy={10} rx={12} ry={4.5} fill="rgba(0,0,0,0.35)" />
@@ -578,6 +619,27 @@ export default function Board({
             })}
         </g>
       </svg>
+      <div className="board-legend" aria-label="Legenda: o que cada terreno produz">
+        <span className="leg-title">Terreno → recurso</span>
+        {(Object.keys(TERRAIN_STYLE) as TerrainKind[]).map((t) => {
+          const res = terrainResource(t);
+          return (
+            <span key={t} className="leg-row">
+              <span className="swatch" style={{ background: TERRAIN_STYLE[t].fill }} />
+              <span className="leg-terrain">{TERRAIN_STYLE[t].label}</span>
+              <span className="leg-arrow" aria-hidden="true">→</span>
+              {res ? (
+                <>
+                  <ResourceIcon kind={res} size={13} />
+                  <span>{RESOURCE_LABEL[res]}</span>
+                </>
+              ) : (
+                <span className="leg-none">nada</span>
+              )}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
