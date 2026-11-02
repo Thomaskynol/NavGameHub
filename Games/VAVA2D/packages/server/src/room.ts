@@ -1285,6 +1285,9 @@ export class Room {
       }
       player.pendingCardOptions = [];
       player.chosenCard = null;
+      // Descarta inputs enfileirados no congelamento (evita rubber-band).
+      player.inputQueue = [];
+      player.ack = player.lastReceivedSeq;
     }
     this.phase = 'playing';
     this.cardRoundTimer = 60;
@@ -1296,6 +1299,11 @@ export class Room {
     if (!player) return;
     if (!player.pendingCardOptions.includes(card as CardType)) return;
     player.chosenCard = card as CardType;
+    // Termina cedo quando todos já escolheram.
+    for (const other of this.players.values()) {
+      if (!other.chosenCard) return;
+    }
+    this.finishCardSelection();
   }
 
   private applyCard(player: ServerPlayer, card: CardType): void {
@@ -1665,6 +1673,15 @@ export class Room {
       drops,
       powerups,
       you: self,
+      ...(this.phase === 'cardSelection'
+        ? {
+            cardProgress: {
+              chose: [...this.players.values()].filter((player) => player.chosenCard).length,
+              total: this.players.size,
+              remaining: Math.max(0, Math.ceil(this.cardSelectionTimer)),
+            },
+          }
+        : {}),
     };
   }
 

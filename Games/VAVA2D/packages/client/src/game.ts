@@ -259,6 +259,7 @@ export class Game {
     const timerEl = document.getElementById('card-timer');
     if (!overlay || !optionsEl || !timerEl) return;
 
+    this.cardChosen = false;
     optionsEl.replaceChildren();
     for (const card of cards) {
       const info = (CARD_INFO as any)[card];
@@ -271,11 +272,8 @@ export class Game {
       option.append(title, desc);
       option.addEventListener('click', () => {
         this.connection?.send({ t: 'chooseCard', card } as any);
-        overlay.classList.add('hidden');
-        if (this.cardTimerHandle !== null) {
-          window.clearInterval(this.cardTimerHandle);
-          this.cardTimerHandle = null;
-        }
+        this.cardChosen = true;
+        this.showCardWaiting();
       });
       optionsEl.append(option);
     }
@@ -297,6 +295,26 @@ export class Game {
     }, 1000);
   }
 
+  private showCardWaiting(): void {
+    const optionsEl = document.getElementById('card-options');
+    if (!optionsEl) return;
+    optionsEl.replaceChildren();
+    const waiting = document.createElement('div');
+    waiting.className = 'card-waiting';
+    waiting.id = 'card-waiting';
+    waiting.textContent = 'Carta escolhida. Aguardando os outros jogadores…';
+    optionsEl.append(waiting);
+    this.refreshCardWaiting();
+  }
+
+  private refreshCardWaiting(): void {
+    const waiting = document.getElementById('card-waiting');
+    const progress = this.latest?.cardProgress;
+    if (!waiting || !progress) return;
+    waiting.textContent =
+      `Carta escolhida. Aguardando os outros jogadores… ${progress.chose}/${progress.total} · ${progress.remaining}s`;
+  }
+
   private onSnapshot(snapshot: Snapshot): void {
     const previous = this.latest;
     const snapCamera =
@@ -308,6 +326,17 @@ export class Game {
     this.latest = snapshot;
     this.interpolator.push(snapshot, performance.now());
     this.predictor.applyServerState(snapshot.you);
+
+    if (snapshot.phase === 'cardSelection') {
+      if (this.cardChosen) this.refreshCardWaiting();
+    } else {
+      document.getElementById('card-overlay')?.classList.add('hidden');
+      if (this.cardTimerHandle !== null) {
+        window.clearInterval(this.cardTimerHandle);
+        this.cardTimerHandle = null;
+      }
+      this.cardChosen = false;
+    }
 
     if (snapCamera) {
       const position = this.predictor.renderPosition();
@@ -516,6 +545,8 @@ export class Game {
 
   private fixedUpdate(): void {
     if (!this.connection || !this.latest) return;
+    // Pausa predição/envio na escolha de cartas (servidor congelado).
+    if (this.latest.phase === 'cardSelection') return;
     const state = this.predictor.state;
     if (!state) return;
 

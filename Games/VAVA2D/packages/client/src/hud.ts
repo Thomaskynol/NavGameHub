@@ -330,6 +330,7 @@ export class Hud {
     this.updateTimer(snapshot);
     this.updateLeaderboard(snapshot, playerId);
     this.updateWaiting(snapshot);
+    this.updateCards(snapshot);
     this.updateDeath(snapshot, you.alive);
     this.updateMatchEnd(snapshot);
     this.updateBuffs(snapshot.you);
@@ -519,6 +520,16 @@ export class Hud {
     this.waitingBanner.classList.toggle('hidden', !waiting);
     if (waiting) {
       this.waitingCount.textContent = `${snapshot.players.length}/8`;
+    }
+  }
+
+  private updateCards(snapshot: Snapshot): void {
+    const selecting = snapshot.phase === 'cardSelection';
+    this.cardBanner.classList.toggle('hidden', !selecting);
+    const progress = snapshot.cardProgress;
+    if (selecting && progress) {
+      this.cardBannerText.textContent =
+        `Escolhendo cartas ${progress.chose}/${progress.total} · ${progress.remaining}s`;
     }
   }
 
