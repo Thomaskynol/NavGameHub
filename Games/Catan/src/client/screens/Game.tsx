@@ -1,15 +1,17 @@
 // Tela de partida: tabuleiro + mão + painéis + barra de turno + fluxos de dev cards.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DevCardKind, HexId, PlayerId, ResourceKind, EdgeId, VertexId } from '../../shared/constants';
 import type { GameCommand } from '../../shared/protocol';
 import { useApp } from '../appContext';
 import { playSfx } from '../audio';
 import Board, { type BoardMode, type BoardPick } from '../board/Board';
 import { getGeometry, legalBuildTargets, legalKnightHexes, legalRobberHexes, robberVictims } from '../board/legalClient';
+import type { LegalTargets } from '../board/legalClient';
 import { parseHubParams } from '../session';
 import HandPanel, { canEnterRoadMode } from '../game/HandPanel';
 import PlayersTop from '../game/PlayersTop';
 import ResultScreen from '../game/ResultScreen';
+import { RewardToast } from '../game/RewardToast';
 import SideTabs from '../game/SideTabs';
 import Tutorial, { TUTORIAL_STEPS } from '../game/Tutorial';
 import TurnBar from '../game/TurnBar';
@@ -23,6 +25,34 @@ import {
 } from '../game/modals';
 
 type BuildMode = null | 'road' | 'settlement' | 'city' | 'free_road' | 'robber' | 'knight';
+
+/**
+ * Barreira de highlights: o Board destaca/clica `legal.roadEdges` direto mesmo com
+ * `mode={kind:'none'}` (Board.tsx), então o Game filtra o `legal` entregue a ele.
+ * Gate fechado => sem arestas de estrada; setup/vértices passam intactos.
+ */
+export function gateRoadHighlights(legal: LegalTargets, canEnter: boolean): LegalTargets {
+  if (canEnter) return legal;
+  if (legal.roadEdges.length === 0 && legal.freeRoadEdges.length === 0) return legal;
+  return { ...legal, roadEdges: [], freeRoadEdges: [] };
+}
+
+/** Ganhos da produção por delta da própria mão (só incrementos; gasto é ignorado). */
+export function productionGains(
+  before: Record<ResourceKind, number>,
+  after: Record<ResourceKind, number>,
+): { resource: string; count: number }[] {
+  return (Object.keys(after) as ResourceKind[])
+    .filter((k) => (after[k] ?? 0) > (before[k] ?? 0))
+    .map((k) => ({ resource: k, count: (after[k] ?? 0) - (before[k] ?? 0) }));
+}
+
+/** Maior seq do kind no histórico (0 quando ausente); gatilho do toast de produção. */
+export function latestKindSeq(history: { seq: number; kind: string }[], kind: string): number {
+  let max = 0;
+  for (const h of history) if (h.kind === kind && h.seq > max) max = h.seq;
+  return max;
+}
 
 interface TutorialFlow {
   step: number; // -1 desligado
@@ -41,6 +71,8 @@ export default function Game({ mock = false }: { mock?: boolean }) {
   const [drawer, setDrawer] = useState<null | 'left' | 'right'>(null);
   const [tut, setTut] = useState<TutorialFlow>({ step: prefs.tutorialSeen ? -1 : 0 });
   const [offerPreset, setOfferPreset] = useState<{ toPlayerId: PlayerId; give: Partial<Record<ResourceKind, number>>; want: Partial<Record<ResourceKind, number>> } | undefined>();
+  const [reward, setReward] = useState<{ seq: number; gains: { resource: string; count: number }[] } | null>(null);
+  const prodSeenRef = useRef<{ roll: number; res: Record<ResourceKind, number> } | null>(null);
 
   const geo = useMemo(() => (view ? getGeometry(view) : null), [view]);
   const legal = useMemo(
@@ -109,6 +141,17 @@ export default function Game({ mock = false }: { mock?: boolean }) {
 
   const winner = view.winnerId != null;
 
+  // Gate da estrada paga: custo (1 tijolo + 1 madeira) ou estrada gratuita da carta.
+  // O Board destaca `legal.*` direto mesmo com mode none, então o legal entregue
+  // a ele também é filtrado (boardLegal) — o gate do boardMode sozinho não segura.
+  const freeRoadsLeft = view.pending?.type === 'road_building' ? view.pending.roadsLeft ?? 0 : 0;
+  const roadGateOpen = canEnterRoadMode(view.you.resources, freeRoadsLeft);
+  const boardLegal = useMemo(() => {
+    if (buildMode === 'free_road' || view.phase === 'dev_road_building') return legal;
+    if (view.phase === 'setup_road' && view.setupCurrentPlayerId === youId) return legal;
+    return gateRoadHighlights(legal, roadGateOpen);
+  }, [legal, buildMode, view.phase, view.pending, view.setupCurrentPlayerId, view.you.resources, youId]);
+
   // ----- modo do tabuleiro -----
   const robberHexes = useMemo(() => legalRobberHexes(view, youId), [view, youId]);
   const knightHexes = useMemo(() => (buildMode === 'knight' ? legalKnightHexes(view, youId) : []), [view, youId, buildMode]);
@@ -124,8 +167,7 @@ export default function Game({ mock = false }: { mock?: boolean }) {
     }
     if (buildMode === 'road') {
       // Gate de custo: sem 1 tijolo + 1 madeira (e sem estrada gratuita), não há placement nem destaques.
-      const free = view.pending?.type === 'road_building' ? view.pending.roadsLeft ?? 0 : 0;
-      if (!canEnterRoadMode(view.you.resources, free)) return { kind: 'none', label: '' };
+      if (!roadGateOpen) return { kind: 'none', label: '' };
       return { kind: 'edge', edges: legal.roadEdges, label: 'Escolha a aresta da estrada' };
     }
     if (buildMode === 'free_road') return { kind: 'edge', edges: legal.freeRoadEdges.length ? legal.freeRoadEdges : legal.roadEdges, label: 'Estrada gratuita' };
@@ -151,6 +193,9 @@ export default function Game({ mock = false }: { mock?: boolean }) {
       setVictimFor({ hexId: pick.id, knight });
       return;
     }
+    // Defesa em profundidade: fora de um modo de aresta não há seleção de estrada
+    // (o Board filtra pelo legal, mas o gate aqui impede o balão de confirmação).
+    if (pick.type === 'edge' && boardMode.kind !== 'edge') return;
     setSelected(pick);
     playSfx('select');
   };
@@ -171,18 +216,19 @@ export default function Game({ mock = false }: { mock?: boolean }) {
       await send({ type: 'setup_road', edgeId: selected.id as EdgeId }, 'place');
       return;
     }
-    if (buildMode === 'road') await send({ type: 'build_road', edgeId: selected.id as EdgeId }, 'place', 'build');
+    if (buildMode === 'road') {
+      // Defesa em profundidade: sem custo e sem estrada gratuita, nunca dispara comando.
+      if (!roadGateOpen || boardMode.kind !== 'edge') return;
+      await send({ type: 'build_road', edgeId: selected.id as EdgeId }, 'place', 'build');
+    }
     if (buildMode === 'free_road') await send({ type: 'place_free_road', edgeId: selected.id as EdgeId }, 'place');
     if (buildMode === 'settlement') await send({ type: 'build_settlement', vertexId: selected.id as VertexId }, 'place', 'build');
     if (buildMode === 'city') await send({ type: 'build_city', vertexId: selected.id as VertexId }, 'thunk', 'build');
   };
 
   const startBuild = (kind: 'road' | 'settlement' | 'city') => {
-    if (kind === 'road') {
-      // TurnBar desabilita o botão sem recurso; defesa em profundidade aqui.
-      const free = view.pending?.type === 'road_building' ? view.pending.roadsLeft ?? 0 : 0;
-      if (!canEnterRoadMode(view.you.resources, free)) return;
-    }
+    // TurnBar desabilita o botão sem recurso (tooltip "Falta …"); defesa em profundidade aqui.
+    if (kind === 'road' && !roadGateOpen) return;
     setSelected(null);
     setBuildMode(kind);
     setDrawer(null);
@@ -239,6 +285,27 @@ export default function Game({ mock = false }: { mock?: boolean }) {
     void app.sendLobby({ type: 'chat', text }).then(() => playSfx('chat'));
   };
 
+  // ----- toast de produção: o que EU ganhei na rodada -----
+  // O GameView não projeta o byResource da produção (server/views.ts rende só texto);
+  // o ganho próprio sai do delta da mão entre a rolagem anterior e a atual.
+  useEffect(() => {
+    const roll = Math.max(latestKindSeq(view.history, 'dice'), latestKindSeq(view.history, 'production'));
+    const prev = prodSeenRef.current;
+    prodSeenRef.current = { roll, res: { ...view.you.resources } };
+    if (prev === null) return; // baseline ao abrir a sala: não toasta o histórico
+    if (roll > prev.roll) {
+      const gains = productionGains(prev.res, view.you.resources);
+      if (gains.length > 0) setReward({ seq: roll, gains });
+    }
+  }, [view]);
+
+  // Auto-dismiss ~3s (só visual; nunca trava input).
+  useEffect(() => {
+    if (!reward) return;
+    const t = setTimeout(() => setReward(null), 3000);
+    return () => clearTimeout(t);
+  }, [reward]);
+
   // descarte obrigatório
   const discardPending = view.pending?.type === 'discard' && view.pending.yourAction;
 
@@ -273,7 +340,7 @@ export default function Game({ mock = false }: { mock?: boolean }) {
           <Board
             view={view}
             geo={geo}
-            legal={legal}
+            legal={boardLegal}
             mode={boardMode}
             selected={selected}
             onPick={(p) => void handlePick(p)}
@@ -293,6 +360,12 @@ export default function Game({ mock = false }: { mock?: boolean }) {
         {phaseInstruction && !selected && (
           <div className="confirm-float" style={{ pointerEvents: 'none' }}>
             <span style={{ fontWeight: 700 }}>{phaseInstruction}</span>
+          </div>
+        )}
+
+        {reward && (
+          <div className="confirm-float" style={{ pointerEvents: 'none' }}>
+            <RewardToast gains={reward.gains} />
           </div>
         )}
 
