@@ -442,6 +442,7 @@ export class Game {
       case 'powerupPickup': {
         const player = this.latest?.players.find((p) => p.id === event.playerId);
         this.hud.addSystem(`${player?.name ?? 'Alguém'} pegou powerup`);
+        if (event.playerId === this.playerId) this.hud.showPowerupToast(event.powerup);
         this.effects.spawnHit(event.x, event.y);
         break;
       }
