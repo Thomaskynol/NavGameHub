@@ -1,7 +1,7 @@
 // Camada mock (apenas DEV com VITE_MOCK=1): GameView completo + motorzinho local.
 // Em produção o import some (tree-shake por import.meta.env.DEV).
 import type { DevCardKind, HexId, PlayerColor, PlayerId, ResourceKind, VertexId, EdgeId } from '../../shared/constants';
-import { COSTS, NUMBER_TOKENS, TERRAIN_COUNTS, TERRAIN_RESOURCE } from '../../shared/constants';
+import { COSTS, NUMBER_TOKENS, RESOURCE_KINDS, TERRAIN_COUNTS, TERRAIN_RESOURCE } from '../../shared/constants';
 import type { PortSlot } from '../../shared/types';
 import type {
   BoardView,
@@ -361,7 +361,9 @@ export function applyMockCommand(view: GameView, payload: { type: string } & Rec
       let res = base.you.resources;
       let players = base.players;
       if (victim) {
-        res = { ...res, [base.you.bankRate >= 2 ? 'ore' : 'ore']: res.ore + 1 };
+        // Mock sem mãos alheias: rouba 1 carta de recurso aleatória (uniforme).
+        const kind = RESOURCE_KINDS[Math.floor(Math.random() * RESOURCE_KINDS.length)];
+        res = { ...res, [kind]: res[kind] + 1 };
         players = players.map((p) => (p.id === victim ? { ...p, resourcesCount: Math.max(0, p.resourcesCount - 1) } : p));
       }
       return {

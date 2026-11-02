@@ -5,7 +5,7 @@ import type { GameCommand } from '../../shared/protocol';
 import { useApp } from '../appContext';
 import { playSfx } from '../audio';
 import Board, { type BoardMode, type BoardPick } from '../board/Board';
-import { getGeometry, legalBuildTargets, legalRobberHexes, robberVictims } from '../board/legalClient';
+import { getGeometry, legalBuildTargets, legalKnightHexes, legalRobberHexes, robberVictims } from '../board/legalClient';
 import { parseHubParams } from '../session';
 import HandPanel, { canEnterRoadMode } from '../game/HandPanel';
 import PlayersTop from '../game/PlayersTop';
@@ -111,10 +111,11 @@ export default function Game({ mock = false }: { mock?: boolean }) {
 
   // ----- modo do tabuleiro -----
   const robberHexes = useMemo(() => legalRobberHexes(view, youId), [view, youId]);
+  const knightHexes = useMemo(() => (buildMode === 'knight' ? legalKnightHexes(view, youId) : []), [view, youId, buildMode]);
   const boardMode: BoardMode = useMemo(() => {
     if (winner) return { kind: 'none', label: '' };
     if (view.phase === 'robber' && view.activePlayerId === youId) return { kind: 'robber', hexes: robberHexes, label: 'Escolha o novo hex do ladrão' };
-    if (buildMode === 'knight') return { kind: 'robber', hexes: robberHexes, label: 'Cavaleiro: escolha o hex' };
+    if (buildMode === 'knight') return { kind: 'robber', hexes: knightHexes, label: 'Cavaleiro: escolha o hex' };
     if (view.phase === 'setup_settlement' && view.setupCurrentPlayerId === youId) {
       return { kind: 'vertex', vertices: legal.setupVertices, label: 'Coloque um assentamento' };
     }
@@ -131,7 +132,7 @@ export default function Game({ mock = false }: { mock?: boolean }) {
     if (buildMode === 'settlement') return { kind: 'vertex', vertices: legal.settlementVertices, label: 'Escolha o local do assentamento' };
     if (buildMode === 'city') return { kind: 'vertex', vertices: legal.cityVertices, label: 'Escolha a casa para promover a cidade' };
     return { kind: 'none', label: '' };
-  }, [winner, view, youId, buildMode, robberHexes, legal]);
+  }, [winner, view, youId, buildMode, robberHexes, knightHexes, legal]);
 
   // ----- interação com o tabuleiro -----
   const handlePick = async (pick: BoardPick) => {

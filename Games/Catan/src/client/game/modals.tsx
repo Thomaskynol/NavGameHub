@@ -360,10 +360,11 @@ export function VictimPicker({
       <div className="victim-list">
         {victimIds.map((id) => {
           const p = view.players.find((x) => x.id === id);
+          const n = p?.resourcesCount ?? 0;
           return (
             <button key={id} type="button" className="btn btn-parchment" onClick={() => onPick(id)}>
               <span className={`pc-dot bg-${p?.color ?? 'white'}`} />
-              {p?.name ?? id}
+              {p?.name ?? id} · {n === 1 ? '1 carta' : `${n} cartas`}
             </button>
           );
         })}

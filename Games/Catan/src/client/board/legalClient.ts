@@ -15,6 +15,7 @@ import {
 } from '../../engine/scores';
 import {
   legalBuildTargets as engineLegalBuildTargets,
+  legalKnightHexes as engineLegalKnightHexes,
   legalRobberHexes as engineLegalRobberHexes,
   robberVictims as engineRobberVictims,
 } from '../../engine/legal';
@@ -141,6 +142,11 @@ export function legalBuildTargets(view: GameView, _geo: IslandGeometry, youId: P
 export function legalRobberHexes(view: GameView, youId: PlayerId): HexId[] {
   const state = rehydrate(view, youId);
   return engineLegalRobberHexes(state, youId);
+}
+
+export function legalKnightHexes(view: GameView, youId: PlayerId): HexId[] {
+  const state = rehydrate(view, youId);
+  return engineLegalKnightHexes(state, youId);
 }
 
 export function robberVictims(view: GameView, _geo: IslandGeometry, hexId: HexId, byPlayerId: PlayerId): PlayerId[] {
