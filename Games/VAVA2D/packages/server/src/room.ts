@@ -821,6 +821,8 @@ export class Room {
       const targetAngle = Math.atan2(dy, dx);
       const diff = Math.abs(normalizeAngle(targetAngle - angle));
       if (diff > 0.55) continue;
+      // Parede da casa blinda como na granada; mato/pedra não blindam.
+      if (explosionBlockedByWall(originX, originY, target.physics.x, target.physics.y)) continue;
 
       target.health = Math.max(0, target.health - damage);
 

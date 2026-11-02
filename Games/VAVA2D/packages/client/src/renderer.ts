@@ -1,4 +1,4 @@
-import { ARENA, DUEL_ARENA, HOUSE, HOUSE_DOORS, HOUSE_WALL_RUNS, OBSTACLES, PLAYER } from '@vava/shared';
+import { ARENA, DUEL_ARENA, HOUSE, HOUSE_DOORS, HOUSE_WALL_RUNS, OBSTACLES, PLAYER, WEAPONS, segmentCircleHit } from '@vava/shared';
 import type { Obstacle } from '@vava/shared';
 import type { Effects } from './effects.js';
 import { mulberry32 } from './rng.js';
@@ -1195,24 +1195,47 @@ export class Renderer {
     }
   }
 
+  // Alcance visível da chama: encurta na primeira parede (kind 'wall'), como o
+  // dano no servidor; mato/pedra não encurtam.
+  private flameLength(x: number, y: number, aim: number, range: number): number {
+    const muzzle = WEAPONS.flamethrower.muzzleOffset;
+    const ox = x + Math.cos(aim) * muzzle;
+    const oy = y + Math.sin(aim) * muzzle;
+    const tx = ox + Math.cos(aim) * range;
+    const ty = oy + Math.sin(aim) * range;
+    let best = 1;
+    for (const obstacle of OBSTACLES) {
+      if (obstacle.kind !== 'wall') continue;
+      const sx = ox - obstacle.x;
+      const sy = oy - obstacle.y;
+      if (sx * sx + sy * sy < obstacle.radius * obstacle.radius) continue;
+      const t = segmentCircleHit(ox, oy, tx, ty, obstacle.x, obstacle.y, obstacle.radius);
+      if (t !== null && t < best) best = t;
+    }
+    return Math.max(60, Math.min(360, muzzle + range * best));
+  }
+
   private drawFlames(frame: RenderFrame): void {
     const ctx = this.ctx;
     for (const player of frame.players) {
       if (!player.alive || player.weapon !== 'flamethrower' || !player.shooting) continue;
       // Chama visível mesmo com o dono invisível: o corpo some, o fogo revela
       // a origem (balance do dash fantasma).
+      const range = WEAPONS.flamethrower.flameRange;
+      const len = this.flameLength(player.x, player.y, player.aim, range);
+      const half = 10 + ((len - 18) / (360 - 18)) * 45;
       ctx.save();
       ctx.translate(player.x, player.y);
       ctx.rotate(player.aim);
-      const gradient = ctx.createLinearGradient(0, 0, 360, 0);
+      const gradient = ctx.createLinearGradient(0, 0, len, 0);
       gradient.addColorStop(0, 'rgba(255, 210, 120, 0.9)');
       gradient.addColorStop(0.5, 'rgba(255, 120, 40, 0.55)');
       gradient.addColorStop(1, 'rgba(255, 60, 20, 0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.moveTo(18, -10);
-      ctx.lineTo(360, -55);
-      ctx.lineTo(360, 55);
+      ctx.lineTo(len, -half);
+      ctx.lineTo(len, half);
       ctx.lineTo(18, 10);
       ctx.closePath();
       ctx.fill();
@@ -1221,8 +1244,8 @@ export class Renderer {
       ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < 18; i += 1) {
         const t = Math.random();
-        const x = 24 + t * 330;
-        const y = (Math.random() - 0.5) * (12 + t * 46);
+        const x = 24 + t * (len - 30);
+        const y = (Math.random() - 0.5) * (12 + t * 46) * (len / 360);
         const size = 2 + Math.random() * (4 - t * 2);
         ctx.globalAlpha = 0.7 * (1 - t);
         ctx.fillStyle = t < 0.4 ? '#fff0a0' : t < 0.7 ? '#ff9a3c' : '#ff5a1f';
