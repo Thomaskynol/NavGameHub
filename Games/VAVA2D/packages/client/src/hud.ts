@@ -54,6 +54,10 @@ export class Hud {
   private readonly nextMatchCount = byId('next-match-count');
   private readonly connectionLost = byId('connection-lost');
   private readonly damageFlash = byId('damage-flash');
+  private readonly duelBanner = byId('duel-banner');
+  private readonly duelText = byId('duel-text');
+  private readonly cardBanner = byId('card-banner');
+  private readonly cardBannerText = byId('card-banner-text');
 
   private currentRoomCode = '';
   private lastLeaderboard = '';
@@ -341,6 +345,15 @@ export class Hud {
   setDeathKiller(name: string): void {
     this.lastKiller = name;
     this.deathKiller.textContent = name;
+  }
+
+  showDuel(text: string): void {
+    this.duelText.textContent = text;
+    this.duelBanner.classList.remove('hidden');
+  }
+
+  hideDuel(): void {
+    this.duelBanner.classList.add('hidden');
   }
 
   addKill(

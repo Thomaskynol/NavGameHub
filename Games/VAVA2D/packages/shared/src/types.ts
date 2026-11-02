@@ -53,6 +53,7 @@ export interface NetPlayer {
   scale: number;
   invincible: boolean;
   invisible: boolean;
+  duel: boolean;
   health: number;
   alive: boolean;
   protected: boolean;
@@ -137,6 +138,7 @@ export interface Snapshot {
   drops: NetDrop[];
   powerups: NetPowerup[];
   you: SelfState;
+  cardProgress?: { chose: number; total: number; remaining: number };
 }
 
 export type GameEvent =
@@ -159,4 +161,6 @@ export type GameEvent =
   | { type: 'join'; name: string }
   | { type: 'leave'; name: string }
   | { type: 'matchStart' }
-  | { type: 'matchEnd'; winnerName: string | null };
+  | { type: 'matchEnd'; winnerName: string | null }
+  | { type: 'duelStart'; a: string; b: string; aName: string; bName: string; seconds: number }
+  | { type: 'duelEnd'; winnerId: string | null; winnerName: string | null; reason: 'kill' | 'timeout' | 'leave' };

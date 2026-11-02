@@ -1,4 +1,4 @@
-import { ARENA, OBSTACLES, PLAYER } from '@vava/shared';
+import { ARENA, DUEL_ARENA, OBSTACLES, PLAYER } from '@vava/shared';
 import type { Obstacle } from '@vava/shared';
 import type { Effects } from './effects.js';
 import { mulberry32 } from './rng.js';
@@ -19,6 +19,7 @@ export interface RenderPlayer {
   alive: boolean;
   protected: boolean;
   isSelf: boolean;
+  duel: boolean;
 }
 
 export interface RenderBullet {
@@ -61,6 +62,7 @@ export interface RenderFrame {
   mouse: { x: number; y: number };
   hitMarker: 'hit' | 'kill' | null;
   showCrosshair: boolean;
+  duelActive: boolean;
 }
 
 interface PlayerAnimation {
@@ -267,6 +269,7 @@ export class Renderer {
     }
 
     this.drawFence();
+    this.drawDuelRing(frame.duelActive);
 
     for (const obstacle of obstaclesByDepth) {
       if (
@@ -339,6 +342,37 @@ export class Renderer {
       ctx.arc(post.x - 1, post.y - 1, 2.6, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.restore();
+  }
+
+  private drawDuelRing(active: boolean): void {
+    const ctx = this.ctx;
+    const { minX, maxX, minY, maxY } = DUEL_ARENA;
+    const w = maxX - minX;
+    const h = maxY - minY;
+    ctx.save();
+    // Piso escuro do ringue.
+    ctx.fillStyle = active ? 'rgba(24, 10, 16, 0.85)' : 'rgba(20, 16, 12, 0.6)';
+    ctx.fillRect(minX, minY, w, h);
+    // Cordas: duas linhas internas claras.
+    ctx.strokeStyle = active ? '#ef7ba8' : 'rgba(239, 123, 168, 0.4)';
+    ctx.lineWidth = active ? 4 : 2.5;
+    ctx.strokeRect(minX + 8, minY + 8, w - 16, h - 16);
+    ctx.strokeStyle = active ? 'rgba(245, 242, 230, 0.85)' : 'rgba(245, 242, 230, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(minX + 18, minY + 18, w - 36, h - 36);
+    // Cantos.
+    ctx.fillStyle = active ? '#ef7ba8' : 'rgba(239, 123, 168, 0.45)';
+    for (const [x, y] of [[minX, minY], [maxX, minY], [minX, maxY], [maxX, maxY]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = active ? 'rgba(245, 184, 208, 0.9)' : 'rgba(245, 184, 208, 0.4)';
+    ctx.font = '700 16px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('DUELO', (minX + maxX) / 2, minY - 18);
     ctx.restore();
   }
 

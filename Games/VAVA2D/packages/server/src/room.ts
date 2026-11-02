@@ -1,5 +1,7 @@
 import {
   ARENA,
+  DUEL,
+  DUEL_ARENA,
   INPUT_QUEUE_LIMIT,
   MATCH,
   OBSTACLES,
@@ -70,6 +72,7 @@ export interface ServerPlayer {
   lifesteal: number;
   duel: number;
   duelPartner: string | null;
+  duelOrigin: { x: number; y: number } | null;
   inDuel: boolean;
   invisible: number;
   cards: CardType[];
@@ -153,6 +156,7 @@ export class Room {
   private pendingDrops: { x: number; y: number; weapon: WeaponType }[] = [];
   private cardRoundTimer = 60;
   private cardSelectionTimer = 0;
+  private pendingDuels: { a: string; b: string; timer: number }[] = [];
   private powerupSpawns: { id: number; x: number; y: number; type: PowerupType; active: boolean; respawnTimer: number }[] = [];
   private nextPowerupId = 1;
   private started = false;
@@ -226,6 +230,7 @@ export class Room {
       lifesteal: 0,
       duel: 0,
       duelPartner: null,
+      duelOrigin: null,
       inDuel: false,
       invisible: 0,
       cards: [],
@@ -259,13 +264,28 @@ export class Room {
     this.players.delete(playerId);
     this.bullets = this.bullets.filter((bullet) => bullet.owner !== playerId);
     this.grenades = this.grenades.filter((grenade) => grenade.owner !== playerId);
-    // end duel
+    // Duelo em andamento: sobrevivente volta à origem (vitória por W.O.).
     for (const other of this.players.values()) {
       if (other.duelPartner === playerId) {
-        other.duelPartner = null;
-        other.inDuel = false;
-        other.duel = 0;
+        this.sendDuelHome(other);
+        this.emit({ type: 'duelEnd', winnerId: other.id, winnerName: other.name, reason: 'leave' });
       }
+    }
+    // Countdown pendente com o desistente: cancela e limpa origens.
+    if (this.pendingDuels.some((duel) => duel.a === playerId || duel.b === playerId)) {
+      for (const duel of this.pendingDuels) {
+        const survivor =
+          duel.a === playerId
+            ? this.players.get(duel.b)
+            : duel.b === playerId
+              ? this.players.get(duel.a)
+              : undefined;
+        if (survivor) survivor.duelOrigin = null;
+      }
+      this.pendingDuels = this.pendingDuels.filter(
+        (duel) => duel.a !== playerId && duel.b !== playerId,
+      );
+      this.emit({ type: 'duelEnd', winnerId: null, winnerName: null, reason: 'leave' });
     }
     this.emit({ type: 'leave', name: player.name });
 
@@ -278,6 +298,7 @@ export class Room {
       this.bullets = [];
       this.grenades = [];
       this.drops = [];
+      this.pendingDuels = [];
       this.dropTimer = DROP.intervalSeconds;
       this.dropWarningSent = false;
       this.pendingDrops = [];
@@ -326,6 +347,7 @@ export class Room {
       this.updatePlayer(player, dt);
     }
 
+    this.updateDuels(dt);
     this.updateBullets(dt);
     this.updateGrenades(dt);
     this.updateDropTimer(dt);
@@ -388,11 +410,16 @@ export class Room {
   }
 
   private beginMatch(): void {
+    this.pendingDuels = [];
     for (const player of this.players.values()) {
       player.kills = 0;
       player.deaths = 0;
       player.inputQueue = [];
       player.ack = player.lastReceivedSeq;
+      player.inDuel = false;
+      player.duelPartner = null;
+      player.duelOrigin = null;
+      player.duel = 0;
       this.spawnPlayer(player);
     }
     this.bullets = [];
@@ -490,6 +517,15 @@ export class Room {
     player.giant = Math.max(0, player.giant - dt);
     player.lifesteal = Math.max(0, player.lifesteal - dt);
     player.duel = Math.max(0, player.duel - dt);
+    if (player.inDuel && player.duel <= 0) {
+      // Timeout do duelo: ambos voltam às origens, sem buff.
+      const partner = player.duelPartner ? this.players.get(player.duelPartner) : undefined;
+      this.sendDuelHome(player);
+      if (partner && partner.inDuel && partner.duelPartner === player.id) {
+        this.sendDuelHome(partner);
+      }
+      this.emit({ type: 'duelEnd', winnerId: null, winnerName: null, reason: 'timeout' });
+    }
 
     if (player.giant <= 0 && player.scale !== 1) {
       player.scale = 1;
@@ -517,12 +553,11 @@ export class Room {
     const bounds = player.inDuel ? undefined : undefined;
     stepPlayerPhysics(player.physics, input, dt, obstacles, speed);
     if (player.inDuel) {
-      // clamp to duel arena
-      const minX = 1000, maxX = 1400, minY = 600, maxY = 1000;
-      if (player.physics.x < minX) { player.physics.x = minX; if (player.physics.vx < 0) player.physics.vx = 0; }
-      if (player.physics.x > maxX) { player.physics.x = maxX; if (player.physics.vx > 0) player.physics.vx = 0; }
-      if (player.physics.y < minY) { player.physics.y = minY; if (player.physics.vy < 0) player.physics.vy = 0; }
-      if (player.physics.y > maxY) { player.physics.y = maxY; if (player.physics.vy > 0) player.physics.vy = 0; }
+      // clamp ao ringue (sem obstáculos lá dentro)
+      if (player.physics.x < DUEL_ARENA.minX) { player.physics.x = DUEL_ARENA.minX; if (player.physics.vx < 0) player.physics.vx = 0; }
+      if (player.physics.x > DUEL_ARENA.maxX) { player.physics.x = DUEL_ARENA.maxX; if (player.physics.vx > 0) player.physics.vx = 0; }
+      if (player.physics.y < DUEL_ARENA.minY) { player.physics.y = DUEL_ARENA.minY; if (player.physics.vy < 0) player.physics.vy = 0; }
+      if (player.physics.y > DUEL_ARENA.maxY) { player.physics.y = DUEL_ARENA.maxY; if (player.physics.vy > 0) player.physics.vy = 0; }
     }
     if (input.shoot && player.reloading <= 0 && player.ammo > 0) {
       player.shooting = true;
@@ -1128,26 +1163,29 @@ export class Room {
         player.lifesteal = 15 * (player.cards.includes('powerupDuration') ? 1.7 : 1);
         break;
       case 'duel': {
-        const candidates = [...this.players.values()].filter((p) => p.id !== player.id && p.alive);
+        if (player.inDuel) break;
+        const busy = new Set<string>();
+        for (const duel of this.pendingDuels) {
+          busy.add(duel.a);
+          busy.add(duel.b);
+        }
+        const candidates = [...this.players.values()].filter(
+          (p) => p.id !== player.id && p.alive && !p.inDuel && !busy.has(p.id),
+        );
         if (candidates.length === 0) break;
         const opponent = candidates[Math.floor(Math.random() * candidates.length)]!;
-        // teleport both to duel arena
-        player.physics.x = 1100;
-        player.physics.y = 700;
-        player.physics.vx = 0;
-        player.physics.vy = 0;
-        opponent.physics.x = 1300;
-        opponent.physics.y = 900;
-        opponent.physics.vx = 0;
-        opponent.physics.vy = 0;
-        player.inDuel = true;
-        opponent.inDuel = true;
-        player.duelPartner = opponent.id;
-        opponent.duelPartner = player.id;
-        player.duel = 999;
-        opponent.duel = 999;
-        player.health = this.playerMaxHealth(player);
-        opponent.health = this.playerMaxHealth(opponent);
+        // Salva origens, avisa e teleporta só após o countdown.
+        player.duelOrigin = { x: player.physics.x, y: player.physics.y };
+        opponent.duelOrigin = { x: opponent.physics.x, y: opponent.physics.y };
+        this.pendingDuels.push({ a: player.id, b: opponent.id, timer: DUEL.countdownSeconds });
+        this.emit({
+          type: 'duelStart',
+          a: player.id,
+          b: opponent.id,
+          aName: player.name,
+          bName: opponent.name,
+          seconds: DUEL.countdownSeconds,
+        });
         break;
       }
     }
@@ -1157,6 +1195,61 @@ export class Room {
 
   private playerMaxHealth(player: ServerPlayer): number {
     return player.giant > 0 ? 500 : PLAYER.maxHealth;
+  }
+
+  /** Devolve o duelista à posição de origem e limpa o estado do duelo. */
+  private sendDuelHome(player: ServerPlayer): void {
+    if (player.duelOrigin) {
+      player.physics.x = player.duelOrigin.x;
+      player.physics.y = player.duelOrigin.y;
+      player.duelOrigin = null;
+    }
+    player.physics.vx = 0;
+    player.physics.vy = 0;
+    player.inDuel = false;
+    player.duelPartner = null;
+    player.duel = 0;
+  }
+
+  private updateDuels(dt: number): void {
+    if (this.pendingDuels.length === 0) return;
+    const ready: { a: string; b: string }[] = [];
+    for (const pending of this.pendingDuels) {
+      pending.timer -= dt;
+      if (pending.timer <= 0) ready.push(pending);
+    }
+    if (ready.length === 0) return;
+    const done = new Set(ready);
+    this.pendingDuels = this.pendingDuels.filter((pending) => !done.has(pending));
+    for (const pending of ready) this.beginDuel(pending.a, pending.b);
+  }
+
+  private beginDuel(aId: string, bId: string): void {
+    const a = this.players.get(aId);
+    const b = this.players.get(bId);
+    if (!a || !b || !a.alive || !b.alive || a.inDuel || b.inDuel) {
+      if (a) a.duelOrigin = null;
+      if (b) b.duelOrigin = null;
+      this.emit({ type: 'duelEnd', winnerId: null, winnerName: null, reason: 'leave' });
+      return;
+    }
+    const midY = (DUEL_ARENA.minY + DUEL_ARENA.maxY) / 2;
+    a.physics.x = DUEL_ARENA.minX + 75;
+    a.physics.y = midY;
+    a.physics.vx = 0;
+    a.physics.vy = 0;
+    b.physics.x = DUEL_ARENA.maxX - 75;
+    b.physics.y = midY;
+    b.physics.vx = 0;
+    b.physics.vy = 0;
+    a.inDuel = true;
+    b.inDuel = true;
+    a.duelPartner = b.id;
+    b.duelPartner = a.id;
+    a.duel = DUEL.durationSeconds;
+    b.duel = DUEL.durationSeconds;
+    a.health = this.playerMaxHealth(a);
+    b.health = this.playerMaxHealth(b);
   }
 
   private randomPowerupType(specialOnly: boolean): PowerupType {
@@ -1441,13 +1534,20 @@ export class Room {
     }
     if (victim.inDuel && victim.duelPartner === killer.id) {
       killer.kills += 2;
-      // end duel
-      killer.inDuel = false;
-      killer.duelPartner = null;
-      killer.duel = 0;
+      // Vencedor volta à origem com buff; vítima limpa (respawn cuida do resto).
+      this.sendDuelHome(killer);
+      victim.duelOrigin = null;
       victim.inDuel = false;
       victim.duelPartner = null;
       victim.duel = 0;
+      killer.damageBoost = Math.max(killer.damageBoost, 10);
+      killer.speedBoost = Math.max(killer.speedBoost, 5);
+      this.emit({
+        type: 'duelEnd',
+        winnerId: killer.id,
+        winnerName: killer.name,
+        reason: 'kill',
+      });
     }
 
     this.emit({
@@ -1477,6 +1577,7 @@ export class Room {
         scale: player.scale,
         invincible: player.invincible > 0,
         invisible: player.invisible > 0,
+        duel: player.inDuel,
         health: player.health,
         alive: player.alive,
         protected: player.spawnProtect > 0,

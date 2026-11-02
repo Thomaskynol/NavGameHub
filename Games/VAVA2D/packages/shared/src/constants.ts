@@ -173,6 +173,20 @@ export const POWERUP = {
   ],
 } as const;
 
+// Ringue do Duelo Mortal: sub-retângulo livre de obstáculos (servidor dá clamp,
+// cliente desenha o ringue). Spawns do duelo: (1125,1075) e (1375,1075).
+export const DUEL_ARENA = {
+  minX: 1050,
+  maxX: 1450,
+  minY: 900,
+  maxY: 1250,
+} as const;
+
+export const DUEL = {
+  countdownSeconds: 5,
+  durationSeconds: 20,
+} as const;
+
 export const CARD_INFO: Record<CardType, { title: string; description: string }> = {
   homing: { title: 'Balas Teleguiadas', description: 'Balas se curvam levemente em direção ao inimigo mais próximo.' },
   dashShot: { title: 'Disparo de Dash', description: 'Cada dash dispara uma espingarda na direção do dash (+1s cooldown do dash).' },

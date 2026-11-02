@@ -521,6 +521,50 @@ kbd {
   letter-spacing: 0.8px;
 }
 
+.duel-banner {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border: 1px solid rgba(239, 123, 168, 0.55);
+  border-radius: 12px;
+  background: rgba(30, 8, 18, 0.85);
+  color: #f5b8d0;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.card-banner {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border: 1px solid rgba(242, 208, 107, 0.45);
+  border-radius: 12px;
+  background: rgba(24, 22, 8, 0.85);
+  color: #f2d06b;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  pointer-events: none;
+}
+
+.card-waiting {
+  padding: 26px 20px;
+  border-radius: 12px;
+  background: rgba(30, 32, 28, 0.85);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 .leaderboard {
   position: absolute;
   top: 66px;

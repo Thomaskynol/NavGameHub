@@ -60,6 +60,8 @@ export class Game {
   private hitMarkerKind: 'hit' | 'kill' = 'hit';
   private deathKiller = 'Abatido';
   private cardTimerHandle: number | null = null;
+  private duelTimerHandle: number | null = null;
+  private cardChosen = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -432,9 +434,54 @@ export class Game {
       case 'matchEnd':
         break;
 
+      case 'duelStart': {
+        const opponent = event.a === this.playerId ? event.bName : event.aName;
+        this.hud.addSystem(`Duelo até a morte: ${event.aName} × ${event.bName}`);
+        this.showDuelBanner(opponent, event.seconds);
+        break;
+      }
+
+      case 'duelEnd': {
+        this.hideDuelBanner();
+        if (event.reason === 'kill' && event.winnerName) {
+          this.hud.addSystem(`${event.winnerName} venceu o duelo`);
+        } else if (event.reason === 'timeout') {
+          this.hud.addSystem('Duelo empatado — tempo esgotado');
+        } else {
+          this.hud.addSystem('Duelo cancelado');
+        }
+        break;
+      }
+
       default:
         break;
     }
+  }
+
+  private showDuelBanner(opponent: string, seconds: number): void {
+    if (this.duelTimerHandle !== null) window.clearInterval(this.duelTimerHandle);
+    let remaining = seconds;
+    this.hud.showDuel(`Duelo até a morte com ${opponent} — ${remaining}s`);
+    this.duelTimerHandle = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        this.hud.showDuel(`Duelo até a morte com ${opponent} — LUTE!`);
+        if (this.duelTimerHandle !== null) {
+          window.clearInterval(this.duelTimerHandle);
+          this.duelTimerHandle = null;
+        }
+      } else {
+        this.hud.showDuel(`Duelo até a morte com ${opponent} — ${remaining}s`);
+      }
+    }, 1000);
+  }
+
+  private hideDuelBanner(): void {
+    if (this.duelTimerHandle !== null) {
+      window.clearInterval(this.duelTimerHandle);
+      this.duelTimerHandle = null;
+    }
+    this.hud.hideDuel();
   }
 
   private loop = (now: number): void => {
@@ -531,6 +578,7 @@ export class Game {
           invincible: player.invincible,
           invisible: player.invisible,
           isSelf: player.id === this.playerId,
+          duel: player.duel,
         });
       }
 
@@ -596,6 +644,7 @@ export class Game {
             invincible: this.latest.you.invincible > 0,
             invisible: this.latest.you.invisible,
             isSelf: true,
+            duel: roster.duel,
           });
         }
       }
@@ -604,7 +653,8 @@ export class Game {
     for (const marker of this.effects.getDropMarkers()) dropTargets.push(marker);
 
     const alive = this.latest?.you.alive === true;
-    const showCrosshair = this.joined && alive && this.latest?.phase !== 'ended';
+
+    const duelActive = pair !== null && pair.after.players.some((player) => player.duel);    const showCrosshair = this.joined && alive && this.latest?.phase !== 'ended';
     const hitMarker = now < this.hitMarkerUntil ? this.hitMarkerKind : null;
 
     this.renderer.render(
@@ -622,6 +672,7 @@ export class Game {
         mouse: this.input.getMouse(),
         hitMarker,
         showCrosshair,
+        duelActive,
       },
       this.effects,
     );
