@@ -65,6 +65,7 @@ export function createCar(x, z, heading, v = 0) {
     nitro: NITRO.tank,        // tanque em unidades do tanque (0..tank)
     nitroActive: false,
     nitroTimer: 0,            // s desde o último uso (regen > regenDelayMs/1000)
+    boostEnv: 0,              // envelope 0..1 do boost (suaviza o fim do nitro)
     offTrack: false,
     drifting: false,
     drift01: 0,               // 0..1 p/ HUD 'dr'
@@ -114,7 +115,7 @@ export function recover(car, ctx) {
     x = p.x; z = p.z; hd = p.heading;
   }
   car.x = x; car.z = z; car.hd = hd;
-  car.v = 0; car.vlat = 0; car.steer01 = 0;
+  car.v = 0; car.vlat = 0; car.steer01 = 0; car.boostEnv = 0;
   car.wallHit = 0; car.drifting = false; car.drift01 = 0;
   if (car.wrongWay) { car.wrongWay = false; events.push({ type: 'wrongway', on: false }); }
   car.wrongWayT = 0;
@@ -159,6 +160,12 @@ function substep(car, input, h, ctx, events) {
   }
   if (car.nitroActive !== wasActive) events.push({ type: 'nitro', on: car.nitroActive });
   const boost = car.nitroActive && car.nitro > 0;
+  // --- envelope do boost: sem corte seco no fim do nitro; o mult efetivo
+  // decai na mesma taxa que a velocidade sangra (coastDecel), então o fade
+  // de yaw não zera a esterçada por segundos (R constante durante a sangria)
+  if (boost) car.boostEnv = 1;
+  else if (car.boostEnv > 0) car.boostEnv = Math.max(0, car.boostEnv - (P.coastDecel / (P.maxSpeed * (N.speedBoost - 1))) * h);
+  const eB = 1 + (N.speedBoost - 1) * (car.boostEnv || 0); // 1 → speedBoost
 
   // --- esterçada suavizada
   const sens = clamp(ctx.steerSensitivity != null ? ctx.steerSensitivity : 1, 0.5, 1.5);
@@ -166,11 +173,11 @@ function substep(car, input, h, ctx, events) {
   car.steer01 += clamp(str - car.steer01, -dS, dS);
 
   // --- yaw: curvature-free com cap de aceleração lateral; ~0 acima de vmax
-  const vmax0 = (car.offTrack ? P.maxSpeedOff : P.maxSpeed) * (boost ? N.speedBoost : 1);
+  const vmax0 = (car.offTrack ? P.maxSpeedOff : P.maxSpeed) * eB;
   const sp = Math.abs(car.v);
   let yaw = (P.steerMax * car.steer01 * sens) / (1 + (sp * P.steerSpeedFalloff) / 25);
-  // nitro: R=v²/aLat cresce com v²; boost² no cap preserva o raio de curva
-  const cap = (FEEL.aLatMax * (boost ? N.speedBoost * N.speedBoost : 1)) / Math.max(sp, FEEL.aLatMinV);
+  // nitro: R=v²/aLat cresce com v²; eB² no cap preserva o raio de curva
+  const cap = (FEEL.aLatMax * eB * eB) / Math.max(sp, FEEL.aLatMinV);
   yaw = clamp(yaw, -cap, cap);
   if (hb) yaw *= P.driftYawBoost; // freio de mão: derrapagem iniciável
   if (sp > vmax0) yaw *= Math.max(0, 1 - (sp - vmax0) / (vmax0 * FEEL.overVmaxFade));
@@ -186,7 +193,7 @@ function substep(car, input, h, ctx, events) {
   }
 
   // --- longitudinal (v assinado; nunca salto instantâneo)
-  const vmax = (car.offTrack ? P.maxSpeedOff : P.maxSpeed) * (boost ? N.speedBoost : 1);
+  const vmax = (car.offTrack ? P.maxSpeedOff : P.maxSpeed) * eB;
   const accel = (car.offTrack ? P.offAccel : P.accel) * (boost ? N.accelBoost : 1);
   if (car.v > vmax) {
     // vmax caiu (nitro acabou/saiu da pista): decai suavemente, não estoura
