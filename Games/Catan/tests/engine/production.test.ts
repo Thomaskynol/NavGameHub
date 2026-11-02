@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../../src/engine';
 import { ERROR_CODES } from '../../src/shared/protocol';
 import type { GameState } from '../../src/shared/types';
-import type { ResourceKind } from '../../src/shared/constants';
+import type { ResourceKind, TerrainKind } from '../../src/shared/constants';
+import { RESOURCE_KINDS, TERRAIN_RESOURCE } from '../../src/shared/constants';
 import {
   addBuilding,
   diceRng,
@@ -210,5 +211,45 @@ describe('produção (roll)', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.players.find((p) => p.id === 'p0')!.resources[freeRes]).toBe(before + 1);
+  });
+
+  it('cada terreno paga o recurso clássico (contrato terreno→recurso, ex. floresta 8 paga madeira)', () => {
+    // Pina o contrato: colinas→tijolo, floresta→madeira, pasto→lã, campos→grão, montanhas→minério.
+    expect(TERRAIN_RESOURCE).toEqual({
+      hills: 'brick',
+      forest: 'lumber',
+      pasture: 'wool',
+      fields: 'grain',
+      mountains: 'ore',
+    });
+    const cases: [TerrainKind, ResourceKind][] = [
+      ['hills', 'brick'],
+      ['forest', 'lumber'],
+      ['pasture', 'wool'],
+      ['fields', 'grain'],
+      ['mountains', 'ore'],
+    ];
+    for (const [terrain, res] of cases) {
+      let s = finishSetup(newGame(3, `t-${terrain}`), makeRng(`t-${terrain}`));
+      s = resetBoard(s);
+      const hex = s.board.hexes.find((h) => h.terrain === terrain);
+      if (!hex) throw new Error(`sem hex de ${terrain}`);
+      hex.number = 8; // o caso do usuário: 8 tem que pagar
+      for (const h of s.board.hexes) {
+        if (h.id !== hex.id && h.number === 8) h.number = null;
+      }
+      s.robberHexId = s.board.hexes.find((h) => h.terrain === 'desert')?.id ?? s.robberHexId;
+      const [v] = hexVertices(s, hex.id);
+      addBuilding(s, 'p0', v, 'settlement');
+      setBank(s, { [res]: 19 });
+      const r = roll(s, 8);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const got = r.state.players.find((p) => p.id === 'p0')!.resources;
+      expect(got[res]).toBe(1);
+      for (const k of RESOURCE_KINDS) {
+        if (k !== res) expect(got[k]).toBe(0);
+      }
+    }
   });
 });

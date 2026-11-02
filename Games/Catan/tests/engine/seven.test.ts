@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { applyCommand, legalRobberHexes, robberVictims } from '../../src/engine';
+import { applyCommand, legalKnightHexes, legalRobberHexes, robberVictims } from '../../src/engine';
 import { ERROR_CODES } from '../../src/shared/protocol';
 import type { GameState, RandomSource } from '../../src/shared/types';
 import {
+  addBuilding,
   diceRng,
   expectErr,
   finishSetup,
+  giveCards,
+  hexVertices,
   makeRng,
   newGame,
   setBank,
@@ -242,5 +245,55 @@ describe('o 7: descarte + ladrão', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.players[r.state.activeIndex].id).toBe('p0');
+  });
+
+  it('duas vítimas com cartas: exige escolha; seed controla o roubo da vítima escolhida', () => {
+    const s1 = rollSeven(sevenScenario(0, 0, 0));
+    expect(s1.phase).toBe('robber');
+    // Hex alvo com construções de dois oponentes (ex.: 2 casas no mesmo hex).
+    const target = s1.board.hexes.find((h) => h.id !== s1.robberHexId);
+    if (!target) throw new Error('sem hex alvo');
+    const [v1, v2] = hexVertices(s1, target.id);
+    addBuilding(s1, 'p1', v1);
+    addBuilding(s1, 'p2', v2);
+    giveCards(s1, 'p1', { brick: 2, lumber: 1 });
+    giveCards(s1, 'p2', { wool: 2 });
+    // A UI deve listar os 2 oponentes como vítimas elegíveis.
+    expect(robberVictims(s1, target.id, 'p0').sort()).toEqual(['p1', 'p2']);
+    // Sem escolha => rejeitado (há adversários no hex).
+    expectErr(applyCommand(s1, 'p0', { type: 'move_robber', hexId: target.id }, { rng: makeRng('x') }), ERROR_CODES.INVALID_POSITION);
+    // Com escolha + seed fixa: next()=0 => idx 0 na ordem [brick, lumber, ...] => brick de p1.
+    const r = applyCommand(s1, 'p0', { type: 'move_robber', hexId: target.id, victimId: 'p1' }, { rng: { next: () => 0 } });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.find((p) => p.id === 'p0')!.resources.brick).toBe(1);
+    expect(r.state.players.find((p) => p.id === 'p1')!.resources.brick).toBe(1);
+    expect(r.state.players.find((p) => p.id === 'p1')!.resources.lumber).toBe(1);
+    // A outra vítima fica intacta.
+    expect(r.state.players.find((p) => p.id === 'p2')!.resources.wool).toBe(2);
+    expect(r.state.phase).toBe('action');
+    const stolen = r.state.history.events.find((e) => e.type === 'stolen');
+    expect(stolen).toBeDefined();
+    if (stolen && stolen.type === 'stolen') {
+      expect(stolen.playerId).toBe('p0');
+      expect(stolen.victimId).toBe('p1');
+      expect(stolen.resource).toBe('brick');
+    }
+  });
+
+  it('cavaleiro oferece os mesmos hexes do ladrão no pre_roll/action do ativo', () => {
+    const s = finishSetup(newGame(3, 'knight-hex'), makeRng('knight-hex'));
+    // Fora do turno / fora dessas fases => nada.
+    expect(legalKnightHexes(s, 'p1')).toEqual([]);
+    const allButRobber = s.board.hexes.map((h) => h.id).filter((id) => id !== s.robberHexId);
+    expect(allButRobber.length).toBe(s.board.hexes.length - 1);
+    // Turno do ativo no pre_roll: todos menos o atual.
+    expect(legalKnightHexes(s, 'p0').sort()).toEqual(allButRobber.sort());
+    // Após rolar (action): continua valendo.
+    const rolled = applyCommand(s, 'p0', { type: 'roll_dice' }, { rng: diceRng(3, 2) });
+    expect(rolled.ok).toBe(true);
+    if (!rolled.ok) return;
+    expect(rolled.state.phase).toBe('action');
+    expect(legalKnightHexes(rolled.state, 'p0').sort()).toEqual(allButRobber.sort());
   });
 });
