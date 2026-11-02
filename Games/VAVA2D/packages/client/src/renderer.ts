@@ -676,30 +676,9 @@ export class Renderer {
     ctx.lineTo(14.5, 3.1);
     ctx.stroke();
 
-    ctx.fillStyle = '#2b3033';
-    ctx.strokeStyle = '#14181a';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.roundRect(12.5, -2.6, 17, 5.2, 1.4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#3f484d';
-    ctx.fillRect(15.5, -2.2, 10, 1.2);
+    this.drawWeapon(player.weapon);
 
-    ctx.fillStyle = '#20262a';
-    ctx.beginPath();
-    ctx.roundRect(11.8, 1.6, 4.6, 5.8, 1);
-    ctx.fill();
-
-    ctx.fillStyle = '#e5b486';
-    ctx.strokeStyle = 'rgba(96, 59, 39, 0.55)';
-    ctx.lineWidth = 1;
-    for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.arc(16.4, side * 2.3, 3.1, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
+    this.drawHands(player.weapon);
 
     ctx.fillStyle = '#3a2a20';
     ctx.beginPath();
@@ -726,6 +705,164 @@ export class Renderer {
 
     if (!player.isSelf) {
       this.drawNameplate(player, frame);
+    }
+  }
+
+  // Armas com silhueta própria (só visual: hitbox e mira seguem no servidor).
+  private drawWeapon(weapon: string): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    switch (weapon) {
+      case 'shotgun': {
+        // Cano duplo, longa, com pump de madeira e bocas de latão.
+        ctx.fillStyle = '#5d422a';
+        ctx.beginPath();
+        ctx.roundRect(7.5, -2, 6.5, 4, 1.5);
+        ctx.fill();
+        ctx.fillStyle = '#2b3033';
+        ctx.strokeStyle = '#14181a';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(13, -2.8, 8, 5.6, 1.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#8a5a33';
+        ctx.strokeStyle = '#4a2f18';
+        ctx.beginPath();
+        ctx.roundRect(21, -3.4, 7, 6.8, 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#3a4147';
+        ctx.fillRect(28, -3.2, 9, 2.4);
+        ctx.fillRect(28, 0.8, 9, 2.4);
+        ctx.save();
+        ctx.shadowColor = 'rgba(242, 208, 107, 0.9)';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#f2d06b';
+        ctx.fillRect(35.6, -3.4, 1.8, 2.8);
+        ctx.fillRect(35.6, 0.6, 1.8, 2.8);
+        ctx.restore();
+        break;
+      }
+      case 'minigun': {
+        // Pesada: caixa larga, 3 canos finos e tambor embaixo.
+        ctx.fillStyle = '#23282c';
+        ctx.strokeStyle = '#0e1113';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(9, -4.2, 14, 8.4, 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ef6461';
+        ctx.fillRect(10.5, -1, 5, 2);
+        ctx.fillStyle = '#15191d';
+        ctx.fillRect(23, -3.4, 14, 1.7);
+        ctx.fillRect(23, -0.9, 14, 1.7);
+        ctx.fillRect(23, 1.6, 14, 1.7);
+        ctx.save();
+        ctx.shadowColor = 'rgba(239, 100, 97, 0.9)';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#ff8b80';
+        ctx.fillRect(36.4, -3.6, 1.6, 2.1);
+        ctx.fillRect(36.4, -1.1, 1.6, 2.1);
+        ctx.fillRect(36.4, 1.4, 1.6, 2.1);
+        ctx.restore();
+        ctx.fillStyle = '#3f484d';
+        ctx.strokeStyle = '#14181a';
+        ctx.beginPath();
+        ctx.arc(13, 7.5, 5.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ef6461';
+        ctx.beginPath();
+        ctx.arc(13, 7.5, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'flamethrower': {
+        // Lança-chamas: tanque vermelho + bico largo com anel laranja.
+        ctx.fillStyle = '#b3402a';
+        ctx.strokeStyle = '#5f1f12';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(5.5, -4, 8.5, 8, 2.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#d4694e';
+        ctx.fillRect(7, -3, 2.5, 6);
+        ctx.strokeStyle = '#2a1a12';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(8, 4);
+        ctx.quadraticCurveTo(13, 6.5, 18, 2.8);
+        ctx.stroke();
+        ctx.fillStyle = '#4a4d52';
+        ctx.strokeStyle = '#22252a';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(14, -2.8, 16, 5.6, 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.save();
+        ctx.shadowColor = 'rgba(255, 138, 60, 0.95)';
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#ff8a3c';
+        ctx.fillRect(28.5, -3.2, 3, 6.4);
+        ctx.fillStyle = '#ffd27d';
+        ctx.beginPath();
+        ctx.arc(32.4, 0, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        break;
+      }
+      case 'unarmed':
+        break;
+      case 'pistol':
+      default: {
+        // Pistola: fina e curta, com mira ciano neon.
+        ctx.fillStyle = '#2b3033';
+        ctx.strokeStyle = '#14181a';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(12.5, -2.1, 13.5, 4.2, 1.2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#4a545a';
+        ctx.fillRect(14.5, -1.7, 8, 1.1);
+        ctx.save();
+        ctx.shadowColor = 'rgba(111, 227, 220, 0.95)';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = '#6fe3dc';
+        ctx.fillRect(24.6, -1.1, 2.2, 2.2);
+        ctx.restore();
+        ctx.fillStyle = '#20262a';
+        ctx.beginPath();
+        ctx.roundRect(11.8, 1.8, 4.2, 5.4, 1);
+        ctx.fill();
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
+  private drawHands(weapon: string): void {
+    const ctx = this.ctx;
+    // Punho dianteiro acompanha o comprimento da arma; desarmado vira guarda.
+    const gripX =
+      weapon === 'shotgun' ? 24
+      : weapon === 'minigun' ? 19
+      : weapon === 'flamethrower' ? 22
+      : weapon === 'unarmed' ? 12.5
+      : 15.5;
+    ctx.fillStyle = '#e5b486';
+    ctx.strokeStyle = 'rgba(96, 59, 39, 0.55)';
+    ctx.lineWidth = 1;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(gripX, side * 2.3, 3.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
   }
 
