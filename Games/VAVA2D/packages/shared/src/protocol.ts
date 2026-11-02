@@ -1,4 +1,4 @@
-import type { GameEvent, Phase, PlayerInput, Snapshot } from './types.js';
+import type { GameEvent, MapId, Phase, PlayerInput, Snapshot } from './types.js';
 
 export interface JoinedMessage {
   t: 'joined';
@@ -12,7 +12,8 @@ export type ClientMessage =
   | { t: 'join'; code: string; name: string; htok?: string | null }
   | { t: 'input'; input: PlayerInput }
   | { t: 'ping'; id: number }
-  | { t: 'chooseCard'; card: string };
+  | { t: 'chooseCard'; card: string }
+  | { t: 'voteMap'; map: MapId };
 
 export type ServerMessage =
   | JoinedMessage

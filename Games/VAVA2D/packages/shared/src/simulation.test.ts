@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ARENA, GRENADE, PLAYER, POWERUP } from './constants.js';
-import { HOUSE, HOUSE_DOORS, OBSTACLES, SPAWN_POINTS } from './map.js';
+import {
+  CITY_BUILDINGS,
+  CITY_OBSTACLES,
+  CITY_POWERUP_POINTS,
+  CITY_SPAWNS,
+  HOUSE,
+  HOUSE_DOORS,
+  OBSTACLES,
+  SPAWN_POINTS,
+  obstaclesFor,
+  powerupPointsFor,
+  spawnsFor,
+} from './map.js';
 import {
   createPlayerPhysics,
   explosionBlockedByWall,
@@ -206,4 +218,120 @@ test('pedra e árvore não blindam explosão (só parede da casa)', () => {
   assert.ok(rock && rock.kind === 'rock');
   // Segmento atravessa a pedra de um lado ao outro: sem parede, sem blindagem.
   assert.ok(!explosionBlockedByWall(rock.x, rock.y - rock.radius - 30, rock.x, rock.y + rock.radius + 30));
+});
+
+// Cidade Neon: mesmos invariantes do Campo, com os obstáculos da cidade.
+test('cidade: spawns e power-ups livres de colisão', () => {
+  for (const point of CITY_SPAWNS) {
+    assert.ok(
+      !pointBlockedByObstacle(point.x, point.y, PLAYER.radius, CITY_OBSTACLES),
+      `spawn (${point.x},${point.y})`,
+    );
+  }
+  for (const point of CITY_POWERUP_POINTS) {
+    assert.ok(
+      !pointBlockedByObstacle(point.x, point.y, 20, CITY_OBSTACLES),
+      `powerup (${point.x},${point.y})`,
+    );
+  }
+});
+
+test('cidade: paredes dos prédios sem fresta, vãos das portas abrem', () => {
+  for (const building of CITY_BUILDINGS) {
+    const doors = building.runs.length > 0 ? building : null;
+    assert.ok(doors);
+    // Varre cada lado: fora do vão tem que colidir, no miolo do vão não.
+    const sweepSide = (
+      fixed: number,
+      from: number,
+      to: number,
+      horizontal: boolean,
+      gaps: Array<{ from: number; to: number }>,
+    ): void => {
+      for (let p = from; p <= to; p += 10) {
+        const x = horizontal ? p : fixed;
+        const y = horizontal ? fixed : p;
+        const inGap = gaps.some((gap) => p > gap.from && p < gap.to);
+        if (inGap) {
+          const core = gaps.some((gap) => p > gap.from + 30 && p < gap.to - 30);
+          if (core) {
+            assert.ok(
+              !pointBlockedByObstacle(x, y, 0, CITY_OBSTACLES),
+              `${building.name}: vão fechado em ${x},${y}`,
+            );
+          }
+        } else {
+          assert.ok(
+            pointBlockedByObstacle(x, y, 0, CITY_OBSTACLES),
+            `${building.name}: furo na parede em ${x},${y}`,
+          );
+        }
+      }
+    };
+    // Reconstroi os vãos a partir dos trechos: trecho ausente = porta.
+    const runsOn = (side: 'N' | 'S' | 'E' | 'W'): Array<{ from: number; to: number }> => {
+      const fixed = side === 'N' ? building.y0 : side === 'S' ? building.y1 : side === 'W' ? building.x0 : building.x1;
+      const horizontal = side === 'N' || side === 'S';
+      const covered: Array<[number, number]> = [];
+      for (const run of building.runs) {
+        if (run.interior) continue;
+        if (horizontal && run.y1 === fixed) covered.push([Math.min(run.x1, run.x2), Math.max(run.x1, run.x2)]);
+        if (!horizontal && run.x1 === fixed) covered.push([Math.min(run.y1, run.y2), Math.max(run.y1, run.y2)]);
+      }
+      covered.sort((a, b) => a[0] - b[0]);
+      const lo = horizontal ? building.x0 : building.y0;
+      const hi = horizontal ? building.x1 : building.y1;
+      const gaps: Array<{ from: number; to: number }> = [];
+      let cursor = lo;
+      for (const [from, to] of covered) {
+        if (from - cursor > 40) gaps.push({ from: cursor, to: from });
+        cursor = Math.max(cursor, to);
+      }
+      if (hi - cursor > 40) gaps.push({ from: cursor, to: hi });
+      return gaps;
+    };
+    sweepSide(building.y0, building.x0, building.x1, true, runsOn('N'));
+    sweepSide(building.y1, building.x0, building.x1, true, runsOn('S'));
+    sweepSide(building.x0, building.y0, building.y1, false, runsOn('W'));
+    sweepSide(building.x1, building.y0, building.y1, false, runsOn('E'));
+  }
+});
+
+test('cidade: prédios fechados não têm vão (cenário, sem entrada)', () => {
+  for (const building of CITY_BUILDINGS) {
+    if (building.open) continue;
+    for (let p = building.x0; p <= building.x1; p += 10) {
+      assert.ok(pointBlockedByObstacle(p, building.y0, 0, CITY_OBSTACLES), `${building.name} N ${p}`);
+      assert.ok(pointBlockedByObstacle(p, building.y1, 0, CITY_OBSTACLES), `${building.name} S ${p}`);
+    }
+    for (let p = building.y0; p <= building.y1; p += 10) {
+      assert.ok(pointBlockedByObstacle(building.x0, p, 0, CITY_OBSTACLES), `${building.name} W ${p}`);
+      assert.ok(pointBlockedByObstacle(building.x1, p, 0, CITY_OBSTACLES), `${building.name} E ${p}`);
+    }
+  }
+});
+
+test('cidade: becos e avenidas passáveis (dash e luta)', () => {
+  // Beco oeste x600-730 e beco leste x1670-1800, de ponta a ponta.
+  for (let y = 120; y <= 1480; y += 40) {
+    assert.ok(!pointBlockedByObstacle(665, y, PLAYER.radius, CITY_OBSTACLES), `beco W y=${y}`);
+    assert.ok(!pointBlockedByObstacle(1735, y, PLAYER.radius, CITY_OBSTACLES), `beco E y=${y}`);
+  }
+  // Avenida principal y700-860 e vertical x1120-1280: praça e extremos livres.
+  assert.ok(!pointBlockedByObstacle(1200, 780, PLAYER.radius, CITY_OBSTACLES), 'praça');
+  assert.ok(!pointBlockedByObstacle(1200, 120, PLAYER.radius, CITY_OBSTACLES), 'norte');
+  assert.ok(!pointBlockedByObstacle(1200, 1480, PLAYER.radius, CITY_OBSTACLES), 'sul');
+});
+
+test('cidade: obstáculos dentro da arena e ajudas de mapa coerentes', () => {
+  for (const obstacle of CITY_OBSTACLES) {
+    assert.ok(obstacle.x > 0 && obstacle.x < ARENA.width, `x ${obstacle.x}`);
+    assert.ok(obstacle.y > 0 && obstacle.y < ARENA.height, `y ${obstacle.y}`);
+  }
+  assert.deepEqual([...spawnsFor('city')], [...CITY_SPAWNS]);
+  assert.deepEqual([...spawnsFor('field')], [...SPAWN_POINTS]);
+  assert.deepEqual([...obstaclesFor('city')], [...CITY_OBSTACLES]);
+  assert.deepEqual([...obstaclesFor('field')], [...OBSTACLES]);
+  assert.deepEqual([...powerupPointsFor('city')], [...CITY_POWERUP_POINTS]);
+  assert.deepEqual([...powerupPointsFor('field')], [...POWERUP.spawnPoints]);
 });

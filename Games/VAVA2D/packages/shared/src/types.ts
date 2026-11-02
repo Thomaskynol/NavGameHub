@@ -5,6 +5,8 @@ export interface Vec2 {
 
 export type Phase = 'waiting' | 'playing' | 'ended' | 'cardSelection';
 
+export type MapId = 'field' | 'city';
+
 export type WeaponType = 'pistol' | 'flamethrower' | 'shotgun' | 'minigun' | 'unarmed';
 
 export type CardType = 'homing' | 'dashShot' | 'weaponCycle' | 'deathGrenade' | 'powerupDuration' | 'ricochet' | 'slowKnockback' | 'wallBounce' | 'chargedShot' | 'dashInvis';
@@ -133,6 +135,10 @@ export interface Snapshot {
   phase: Phase;
   timeLeft: number;
   winnerId: string | null;
+  /** Mapa congelado da partida: todos os clientes renderizam o mesmo. */
+  mapId: MapId;
+  /** Votação em andamento (só na fase waiting): placar + segundos restantes. */
+  mapVote?: { field: number; city: number; remaining: number; total: number };
   players: NetPlayer[];
   bullets: NetBullet[];
   grenades: NetGrenade[];

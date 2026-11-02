@@ -151,6 +151,17 @@ export const MATCH = {
   roomEmptyTtlMs: 60_000,
 } as const;
 
+/** Votação de mapa: janela em `waiting` antes de cada partida. */
+export const MAP_VOTE = {
+  durationSeconds: 10,
+} as const;
+
+/** Nomes de exibição dos mapas (placar da votação). */
+export const MAP_NAMES: Record<string, string> = {
+  field: 'Campo',
+  city: 'Cidade Neon',
+} as const;
+
 export const DROP = {
   count: 4,
   intervalSeconds: 20,
