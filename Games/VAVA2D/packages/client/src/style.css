@@ -1213,16 +1213,112 @@ kbd {
 }
 
 .buffs {
-  margin-top: 7px;
-  color: var(--accent-strong);
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.8px;
-  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .buffs.hidden {
   display: none;
+}
+
+.buff-chip {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  grid-template-rows: auto 3px;
+  align-items: center;
+  gap: 2px 7px;
+  padding: 4px 8px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.buff-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--buff);
+  box-shadow: 0 0 6px var(--buff);
+}
+
+.buff-name {
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.buff-time {
+  color: var(--buff);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.buff-track {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.buff-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--buff);
+  box-shadow: 0 0 6px var(--buff);
+  transition: width 0.2s linear;
+}
+
+.powerup-toast {
+  --toast: var(--accent);
+  position: absolute;
+  top: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 220px;
+  max-width: 82vw;
+  padding: 10px 22px 11px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--toast);
+  border-right: 3px solid var(--toast);
+  border-radius: 12px;
+  background: rgba(10, 16, 9, 0.85);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  text-align: center;
+  pointer-events: none;
+}
+
+.powerup-toast.pop {
+  animation: toast-pop 0.22s ease-out;
+}
+
+.powerup-toast strong {
+  color: var(--toast);
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 14px var(--toast);
+}
+
+.powerup-toast span {
+  color: var(--cream);
+  font-size: 11.5px;
+}
+
+@keyframes toast-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.92);
+  }
 }
 
 .card-options {

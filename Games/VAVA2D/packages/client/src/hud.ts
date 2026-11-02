@@ -14,6 +14,19 @@ function byId<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+// Copy curta PT-BR do toast de power-up (revisão de texto sem mexer no visual).
+const POWERUP_COPY: Record<string, { title: string; desc: string; color: string }> = {
+  speed: { title: 'Velocidade!', desc: '+50% de velocidade', color: '#5aa9e6' },
+  heal: { title: 'Vida cheia!', desc: 'Recuperou toda a vida', color: '#74c69d' },
+  shield: { title: 'Escudo!', desc: 'Invencível por alguns segundos', color: '#4dd0c8' },
+  damage: { title: 'Dano maior!', desc: '+50% de dano', color: '#e76f51' },
+  cooldown: { title: 'Recarga turbo!', desc: 'Tiro sem parar', color: '#a78bfa' },
+  grenade: { title: 'Granadas!', desc: 'Granada sempre pronta', color: '#f2d06b' },
+  duel: { title: 'Duelo!', desc: 'Levado à arena', color: '#ef7ba8' },
+  giant: { title: 'Gigante!', desc: 'Vida gigante por um tempo', color: '#f4a259' },
+  lifesteal: { title: 'Roubo de vida!', desc: 'Cure-se ao acertar', color: '#ef6461' },
+};
+
 export class Hud {
   private readonly menuScreen = byId('menu-screen');
   private readonly hud = byId('hud');
@@ -58,6 +71,11 @@ export class Hud {
   private readonly duelText = byId('duel-text');
   private readonly cardBanner = byId('card-banner');
   private readonly cardBannerText = byId('card-banner-text');
+  private readonly powerupToast = byId('powerup-toast');
+  private readonly powerupToastTitle = byId('powerup-toast-title');
+  private readonly powerupToastDesc = byId('powerup-toast-desc');
+  private powerupToastTimeout: number | null = null;
+  private buffChips = new Map<string, { root: HTMLElement; time: HTMLElement; bar: HTMLElement }>();
 
   private currentRoomCode = '';
   private lastLeaderboard = '';
@@ -146,6 +164,9 @@ export class Hud {
     this.clearMenuError();
     this.setMenuBusy(false);
     this.resetFeed();
+    this.hidePowerupToast();
+    this.buffs.replaceChildren();
+    this.buffChips.clear();
     this.lastLeaderboard = '';
     this.lastFinalScores = '';
     this.lastAmmo = -1;
@@ -158,6 +179,7 @@ export class Hud {
 
   showMenu(): void {
     this.hud.classList.add('hidden');
+    this.hidePowerupToast();
     this.menuScreen.classList.remove('hidden');
     this.connectionLost.classList.add('hidden');
     this.deathOverlay.classList.add('hidden');
@@ -355,6 +377,36 @@ export class Hud {
 
   hideDuel(): void {
     this.duelBanner.classList.add('hidden');
+  }
+
+  /** Toast de power-up: "pegou X — efeito Y". Some sozinho. */
+  showPowerupToast(type: string): void {
+    const copy = POWERUP_COPY[type] ?? {
+      title: 'Power-up!',
+      desc: 'Efeito ativado',
+      color: '#ffffff',
+    };
+    this.powerupToastTitle.textContent = copy.title;
+    this.powerupToastDesc.textContent = copy.desc;
+    this.powerupToast.style.setProperty('--toast', copy.color);
+    this.powerupToast.classList.remove('hidden');
+    // Reinicia a animação mesmo com coletas em sequência.
+    this.powerupToast.classList.remove('pop');
+    void this.powerupToast.offsetWidth;
+    this.powerupToast.classList.add('pop');
+    if (this.powerupToastTimeout !== null) window.clearTimeout(this.powerupToastTimeout);
+    this.powerupToastTimeout = window.setTimeout(() => {
+      this.powerupToast.classList.add('hidden');
+      this.powerupToastTimeout = null;
+    }, 2600);
+  }
+
+  private hidePowerupToast(): void {
+    if (this.powerupToastTimeout !== null) {
+      window.clearTimeout(this.powerupToastTimeout);
+      this.powerupToastTimeout = null;
+    }
+    this.powerupToast.classList.add('hidden');
   }
 
   addKill(
@@ -625,18 +677,54 @@ export class Hud {
   }
 
   private updateBuffs(you: Snapshot['you']): void {
-    const active: string[] = [];
-    if (you.speedBoost > 0) active.push(`Vel ${you.speedBoost.toFixed(1)}s`);
-    if (you.invincible > 0) active.push(`Escudo ${you.invincible.toFixed(1)}s`);
-    if (you.damageBoost > 0) active.push(`Dano ${you.damageBoost.toFixed(1)}s`);
-    if (you.cooldownBoost > 0) active.push(`CD ${you.cooldownBoost.toFixed(1)}s`);
-    if (you.infiniteAmmo > 0) active.push(`Munição ∞ ${you.infiniteAmmo.toFixed(1)}s`);
-    if (you.grenadeBoost > 0) active.push(`Granada ∞ ${you.grenadeBoost.toFixed(1)}s`);
-    if (you.giant > 0) active.push(`Gigante ${you.giant.toFixed(1)}s`);
-    if (you.lifesteal > 0) active.push(`Lifesteal ${you.lifesteal.toFixed(1)}s`);
-    if (you.duel > 0) active.push('Duelo');
-    this.buffs.textContent = active.join(' · ');
-    this.buffs.classList.toggle('hidden', active.length === 0);
+    const mult = you.cards.includes('powerupDuration') ? 1.7 : 1;
+    const buffs: Array<{ name: string; remaining: number; max: number; color: string }> = [];
+    if (you.speedBoost > 0) buffs.push({ name: 'Vel', remaining: you.speedBoost, max: 5 * mult, color: '#5aa9e6' });
+    if (you.invincible > 0) buffs.push({ name: 'Escudo', remaining: you.invincible, max: 8 * mult, color: '#4dd0c8' });
+    if (you.damageBoost > 0) buffs.push({ name: 'Dano', remaining: you.damageBoost, max: 10 * mult, color: '#e76f51' });
+    // Recarga turbo dá CD rápido + munição infinita juntos: um chip só.
+    const turbo = Math.max(you.cooldownBoost, you.infiniteAmmo);
+    if (turbo > 0) buffs.push({ name: 'Turbo', remaining: turbo, max: 10 * mult, color: '#a78bfa' });
+    if (you.grenadeBoost > 0) buffs.push({ name: 'Granada', remaining: you.grenadeBoost, max: 5 * mult, color: '#f2d06b' });
+    if (you.giant > 0) buffs.push({ name: 'Gigante', remaining: you.giant, max: 15 * mult, color: '#f4a259' });
+    if (you.lifesteal > 0) buffs.push({ name: 'Suga-vida', remaining: you.lifesteal, max: 15 * mult, color: '#ef6461' });
+    if (you.duel > 0) buffs.push({ name: 'Duelo', remaining: you.duel, max: 20, color: '#ef7ba8' });
+
+    const seen = new Set<string>();
+    for (const buff of buffs) {
+      seen.add(buff.name);
+      let chip = this.buffChips.get(buff.name);
+      if (!chip) {
+        const root = document.createElement('div');
+        root.className = 'buff-chip';
+        root.style.setProperty('--buff', buff.color);
+        const dot = document.createElement('span');
+        dot.className = 'buff-dot';
+        const name = document.createElement('span');
+        name.className = 'buff-name';
+        name.textContent = buff.name;
+        const time = document.createElement('span');
+        time.className = 'buff-time';
+        const track = document.createElement('div');
+        track.className = 'buff-track';
+        const bar = document.createElement('div');
+        bar.className = 'buff-bar';
+        track.append(bar);
+        root.append(dot, name, time, track);
+        this.buffs.append(root);
+        chip = { root, time, bar };
+        this.buffChips.set(buff.name, chip);
+      }
+      chip.time.textContent = `${Math.ceil(buff.remaining)}s`;
+      chip.bar.style.width = `${Math.max(0, Math.min(100, (buff.remaining / buff.max) * 100))}%`;
+    }
+    for (const [name, chip] of this.buffChips) {
+      if (!seen.has(name)) {
+        chip.root.remove();
+        this.buffChips.delete(name);
+      }
+    }
+    this.buffs.classList.toggle('hidden', buffs.length === 0);
   }
 
   private pushFeed(entry: HTMLElement): void {
