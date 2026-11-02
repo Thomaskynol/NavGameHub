@@ -166,6 +166,21 @@ export default function Board({
   const [pan, setPan] = useState({ x: VIEW_W / 2, y: VIEW_H / 2 });
   const [dragging, setDragging] = useState(false);
   const [hover, setHover] = useState<BoardPick | null>(null);
+  // Legenda colapsada por padrão: tabuleiro limpo, tudo a 1 clique no "?".
+  const [showLegend, setShowLegend] = useState(false);
+  // Brilho do dado: hexes com o número sorteado pulsam ~2s para todos.
+  // shortcut: totais idênticos em seguida não re-disparam (caso raro, sem trava de render).
+  const diceTotal = view.dice ? view.dice.d1 + view.dice.d2 : null;
+  const [diceGlow, setDiceGlow] = useState<number | null>(null);
+  useEffect(() => {
+    if (diceTotal == null) {
+      setDiceGlow(null);
+      return;
+    }
+    setDiceGlow(diceTotal);
+    const t = setTimeout(() => setDiceGlow(null), 2000);
+    return () => clearTimeout(t);
+  }, [diceTotal]);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
@@ -384,8 +399,9 @@ export default function Board({
             const legalHex = isLegalHex(h.id);
             const isRobber = view.board.robberHexId === h.id;
             const produced = terrainResource(h.tile.terrain as TerrainKind);
+            const glows = diceGlow != null && h.tile.number === diceGlow;
             return (
-              <g key={h.id} className={`board-hex${legalHex ? ' robber-target' : ''}`}>
+              <g key={h.id} className={`board-hex${legalHex ? ' robber-target' : ''}${glows ? ' dice-hit' : ''}`}>
                 <title>{`${st.label} — ${produced ? `produz ${RESOURCE_LABEL[produced]}` : 'não produz recurso'}`}</title>
                 <polygon
                   points={hexPathPoints(h.x, h.y)}
@@ -395,6 +411,17 @@ export default function Board({
                   strokeLinejoin="round"
                 />
                 <polygon points={hexPathPoints(h.x, h.y)} fill={`url(#tex-${h.tile.terrain})`} stroke="none" pointerEvents="none" />
+                {glows && (
+                  <polygon
+                    points={hexPathPoints(h.x, h.y)}
+                    fill="rgba(230,183,74,0.22)"
+                    stroke="#ffe9a8"
+                    strokeWidth={4}
+                    strokeLinejoin="round"
+                    className="dice-glow"
+                    pointerEvents="none"
+                  />
+                )}
                 {legalHex && (
                   <polygon
                     points={hexPathPoints(h.x, h.y)}
@@ -619,26 +646,39 @@ export default function Board({
             })}
         </g>
       </svg>
-      <div className="board-legend" aria-label="Legenda: o que cada terreno produz">
-        <span className="leg-title">Terreno → recurso</span>
-        {(Object.keys(TERRAIN_STYLE) as TerrainKind[]).map((t) => {
-          const res = terrainResource(t);
-          return (
-            <span key={t} className="leg-row">
-              <span className="swatch" style={{ background: TERRAIN_STYLE[t].fill }} />
-              <span className="leg-terrain">{TERRAIN_STYLE[t].label}</span>
-              <span className="leg-arrow" aria-hidden="true">→</span>
-              {res ? (
-                <>
-                  <ResourceIcon kind={res} size={13} />
-                  <span>{RESOURCE_LABEL[res]}</span>
-                </>
-              ) : (
-                <span className="leg-none">nada</span>
-              )}
-            </span>
-          );
-        })}
+      <div className="board-legend-float">
+        <button
+          type="button"
+          className="legend-toggle"
+          aria-expanded={showLegend}
+          aria-label={showLegend ? 'Fechar legenda de terrenos' : 'Abrir legenda: o que cada terreno produz'}
+          onClick={() => setShowLegend((v) => !v)}
+        >
+          ?
+        </button>
+        {showLegend && (
+          <div className="board-legend-panel" role="dialog" aria-label="Legenda: o que cada terreno produz">
+            <span className="leg-title">Terreno → recurso</span>
+            {(Object.keys(TERRAIN_STYLE) as TerrainKind[]).map((t) => {
+              const res = terrainResource(t);
+              return (
+                <span key={t} className="leg-row">
+                  <span className="swatch" style={{ background: TERRAIN_STYLE[t].fill }} />
+                  <span className="leg-terrain">{TERRAIN_STYLE[t].label}</span>
+                  <span className="leg-arrow" aria-hidden="true">→</span>
+                  {res ? (
+                    <>
+                      <ResourceIcon kind={res} size={13} />
+                      <span>{RESOURCE_LABEL[res]}</span>
+                    </>
+                  ) : (
+                    <span className="leg-none">nada</span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
