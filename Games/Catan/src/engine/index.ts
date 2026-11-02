@@ -3,4 +3,4 @@ export { generateBoard } from './mapgen';
 export { createGame } from './game';
 export { applyCommand } from './commands';
 export { computeLongestRoad, publicVictoryPoints, totalVictoryPoints, bestBankRate } from './scores';
-export { legalBuildTargets, legalRobberHexes, robberVictims } from './legal';
+export { legalBuildTargets, legalKnightHexes, legalRobberHexes, robberVictims } from './legal';

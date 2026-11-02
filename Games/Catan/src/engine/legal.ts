@@ -221,6 +221,16 @@ export function legalRobberHexes(s: GameState, playerId: PlayerId): HexId[] {
   return s.board.hexes.map((h) => h.id).filter((id) => id !== s.robberHexId);
 }
 
+/**
+ * Hexes clicáveis para o Cavaleiro: os mesmos do ladrão (todos menos o atual),
+ * mas no pre_roll/action do turno do jogador (a carta resolve o roubo na hora).
+ */
+export function legalKnightHexes(s: GameState, playerId: PlayerId): HexId[] {
+  if (s.phase !== 'pre_roll' && s.phase !== 'action') return [];
+  if (currentActorId(s) !== playerId) return [];
+  return s.board.hexes.map((h) => h.id).filter((id) => id !== s.robberHexId);
+}
+
 /** Jogador corrente: fila de setup ou jogador ativo. */
 export function currentActorId(s: GameState): PlayerId | null {
   if (s.phase === 'setup_settlement' || s.phase === 'setup_road') {
