@@ -535,7 +535,6 @@ export class Game {
       }
 
       for (const bullet of pair.after.bullets) {
-        if (bullet.owner === this.playerId) continue;
         const before = pair.before.bullets.find((candidate) => candidate.id === bullet.id);
         bullets.push({
           id: bullet.id,

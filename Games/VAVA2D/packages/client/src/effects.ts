@@ -96,7 +96,8 @@ export class Effects {
   }
 
   spawnTracer(x: number, y: number, angle: number): void {
-    this.tracers.push({ x, y, angle, life: PISTOL.bulletLifetime });
+    // Flash curto: a bala real vem do snapshot (sem duplicar).
+    this.tracers.push({ x, y, angle, life: 0.09 });
   }
 
   spawnHit(x: number, y: number): void {
