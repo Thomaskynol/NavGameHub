@@ -40,6 +40,7 @@ const CAM_LERP = 8;           // 1/s de suavização
 const SKID_MAX = 256;         // ring-buffer de marcas de derrapagem
 const SMOKE_MAX = 40;         // pool de fumaça
 const BUF_MAX = 40;           // amostras por remoto (~2.7 s a 15 Hz)
+const REMOTE_EXTRAP_CAP_MS = 200; // teto de dead-reckoning além da última amostra
 const TAU = Math.PI * 2;
 
 const ZERO_INPUT = Object.freeze({
@@ -830,10 +831,19 @@ export function createEngine({ mount, getSettings }) {
       let steer;
       if (!buf.length) {
         ({ x, z, hd, v, steer } = r.cur);
-      } else if (buf.length === 1 || renderT <= buf[0].t) {
+      } else if (renderT <= buf[0].t) {
         ({ x, z, hd, v, steer } = buf[0]);
       } else if (renderT >= buf[buf.length - 1].t) {
-        ({ x, z, hd, v, steer } = buf[buf.length - 1]);
+        // dead-reckoning com cap: avança x,z por v*dt na direção hd até
+        // REMOTE_EXTRAP_CAP_MS além da última amostra; depois congela.
+        // (interp normal abaixo segue intacta; sem mexer em colisão/autoridade)
+        const last = buf[buf.length - 1];
+        const overS = Math.min((renderT - last.t) / 1000, REMOTE_EXTRAP_CAP_MS / 1000);
+        x = last.x + Math.sin(last.hd) * last.v * overS;
+        z = last.z + Math.cos(last.hd) * last.v * overS;
+        hd = last.hd;
+        v = last.v;
+        steer = last.steer;
       } else {
         let i = buf.length - 1;
         while (i > 0 && buf[i - 1].t > renderT) i--;
