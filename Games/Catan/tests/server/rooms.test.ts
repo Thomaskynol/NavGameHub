@@ -48,7 +48,7 @@ describe('salas', () => {
     if (!full.ok) expect(full.error.code).toBe('ROOM_FULL');
   });
 
-  it('start_game: só anfitrião, exige 3+ jogadores todos prontos', async () => {
+  it('start_game: só anfitrião, exige 2+ jogadores todos prontos', async () => {
     const host = await createRoom(h, 'Ana');
     const code = host.session.roomCode;
     const j1 = await joinRoom(h, code, 'Bia');
@@ -68,13 +68,17 @@ describe('salas', () => {
     expect(started.ok).toBe(true);
   });
 
-  it('NEED_PLAYERS com menos de 3 jogadores', async () => {
+  it('NEED_PLAYERS com menos de 2 jogadores; 2 prontos iniciam', async () => {
     const host = await createRoom(h, 'Ana');
-    await joinRoom(h, host.session.roomCode, 'Bia');
     await lobby(host.socket, { type: 'set_ready', ready: true });
     const res = await lobby(host.socket, { type: 'start_game' });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error.code).toBe('NEED_PLAYERS');
+    // 2 jogadores prontos: inicia normalmente.
+    const j1 = await joinRoom(h, host.session.roomCode, 'Bia');
+    await lobby(j1.socket, { type: 'set_ready', ready: true });
+    const started = await lobby(host.socket, { type: 'start_game', boardSeed: 'duo' });
+    expect(started.ok).toBe(true);
   });
 
   it('após início: join_room => ALREADY_STARTED; set_color => WRONG_PHASE', async () => {

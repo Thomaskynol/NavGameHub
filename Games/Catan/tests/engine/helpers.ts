@@ -73,7 +73,7 @@ export function setupStep(s: GameState, rng: RandomSource): GameState {
   return act(s, { type: 'setup_road', edgeId: hints.setupEdges[0] }, rng);
 }
 
-/** Completa toda a preparação (3–4 jogadores). */
+/** Completa toda a preparação (2–4 jogadores). */
 export function finishSetup(s: GameState, rng: RandomSource): GameState {
   let cur = s;
   let guard = 0;

@@ -139,6 +139,29 @@ describe('preparação (setup snake)', () => {
     expect(s4.roads.some((r) => r.edgeId === usedEdge)).toBe(true);
   });
 
+  it('fila snake correta para 2 jogadores: [p0,p1,p1,p0]', () => {
+    const s = newGame(2, 'snake2');
+    expect(s.setup.queue).toEqual(['p0', 'p1', 'p1', 'p0']);
+    expect(s.phase).toBe('setup_settlement');
+  });
+
+  it('setup completo 2p: 2 assentamentos + 2 estradas por jogador; fase pre_roll do p0', () => {
+    const rng = makeRng('full2');
+    let s = newGame(2, 'full2');
+    const order: string[] = [];
+    while (s.phase === 'setup_settlement' || s.phase === 'setup_road') {
+      if (s.phase === 'setup_settlement') order.push(s.setup.queue[s.setup.pos]);
+      s = setupStep(s, rng);
+    }
+    expect(s.phase).toBe('pre_roll');
+    expect(s.activeIndex).toBe(0);
+    expect(order).toEqual(['p0', 'p1', 'p1', 'p0']);
+    for (const p of s.players) {
+      expect(buildingsOf(s, p.id).length).toBe(2);
+      expect(roadsOf(s, p.id).length).toBe(2);
+    }
+  });
+
   it('comandos fora de fase na preparação são rejeitados', () => {
     const s = newGame(3, 'phase');
     const rng = makeRng('phase');

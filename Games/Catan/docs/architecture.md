@@ -29,7 +29,7 @@ export function generateBoard(boardSeed: string): BoardLayout;
 
 /** Cria estado inicial: fase setup_settlement, fila snake na ordem do array, ladrão no deserto. */
 export function createGame(opts: {
-  players: { id: PlayerId; name: string; color: PlayerColor }[]; // 3–4; ordem do array = ordem de turno
+  players: { id: PlayerId; name: string; color: PlayerColor }[]; // 2–4; ordem do array = ordem de turno
   boardSeed: string;
   rng: RandomSource; // usada por applyCommand para dados/baralho/roubo
 }): GameState;

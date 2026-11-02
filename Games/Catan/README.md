@@ -1,6 +1,6 @@
 # Catan Deluxe Multiplayer
 
-Catan clássico multijogador no navegador (3–4 jogadores), salas privadas por código, UI deluxe em português do Brasil, servidor autoritativo em Node + Socket.IO e persistência em SQLite.
+Catan clássico multijogador no navegador (2–4 jogadores), salas privadas por código, UI deluxe em português do Brasil, servidor autoritativo em Node + Socket.IO e persistência em SQLite.
 
 Projeto independente, sem vínculo com a marca Catan®/Kosmos.
 
@@ -38,7 +38,7 @@ Abra `http://localhost:5173` (dev) ou `http://localhost:3001` (`PORT`, default *
 
 1. **Criar sala** (ou entrar com código de 5 letras) e escolher apelido.
 2. Compartilhe o código da sala. Cada jogador entra no mesmo navegador (abas) ou em outro dispositivo.
-3. No lobby: escolher cor, marcar **Pronto**; o anfitrião inicia com 3–4 jogadores.
+3. No lobby: escolher cor, marcar **Pronto**; o anfitrião inicia com 2–4 jogadores.
 4. Partida: colocar 2 assentamentos + 2 estradas em ordem de cobrinha, depois rolar dados, construir, trocar e chegar a **10 pontos de vitória**.
 
 - **Recuperação de sessão:** cada jogador recebe um *código de recuperação* (guarde-o). Em outro navegador/aba use "Recuperar sessão" com o código da sala + código de recuperação. Se a sessão já estiver ativa em outra aba, o jogo oferece **Recuperar controle** (assume) ou **Entrar como novo jogador**.

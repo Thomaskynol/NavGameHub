@@ -43,12 +43,12 @@ export default function Lobby() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [view?.chat?.length]);
 
-  const missing = Math.max(0, 3 - players.length);
+  const missing = Math.max(0, 2 - players.length);
   const notReady = players.filter((p) => !p.ready).length;
-  const startBlocked = players.length < 3 || notReady > 0;
+  const startBlocked = players.length < 2 || notReady > 0;
   const startReason =
-    players.length < 3
-      ? `Faltam ${missing} jogador${missing > 1 ? 'es' : ''} (mínimo 3).`
+    players.length < 2
+      ? `Falta ${missing} jogador${missing > 1 ? 'es' : ''} (mínimo 2).`
       : notReady > 0
         ? `${notReady} jogador${notReady > 1 ? 'es' : ''} ainda não ${notReady > 1 ? 'estão' : 'está'} pronto${notReady > 1 ? 's' : ''}.`
         : '';

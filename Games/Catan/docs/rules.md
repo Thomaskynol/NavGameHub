@@ -6,6 +6,7 @@ Documento de referência para a implementação digital deste projeto.
 
 - **Edição**: CATAN – Game Rules & Almanac (3–4 jogadores), 5ª edição em inglês, copyright 2020 Catan GmbH / Catan Studio. Regras desta versão têm precedimento sobre versões anteriores (declaração do próprio manual, regras vigentes desde 2015-01-01).
 - **Escopo**: base game, 3–4 jogadores. Expansões (Seafarers, Cities & Knights etc.) fora do escopo.
+- **Adaptação do projeto (2 jogadores)**: o projeto permite partidas com **2 jogadores** (mudança de regra autorizada): snake `[p0,p1,p1,p0]`, demais regras inalteradas. O manual oficial cobre 3–4; em conflito, vale o manual para 3–4 e esta adaptação para 2.
 
 Fontes consultadas (data de acesso: 14/10/2026):
 
@@ -29,7 +30,7 @@ Observação: o índice de regras oficiais confirma o PDF acima como o manual ar
 
 ### 2.2 Preparação (setup ida-e-volta)
 
-- Ordem "snake draft" em 2 rodadas; cada rodada: 1 assentamento + 1 estrada adjacente.
+- Ordem "snake draft" em 2 rodadas; cada rodada: 1 assentamento + 1 estrada adjacente. Fila: `[p0,p1,p2,p3,p3,p2,p1,p0]` (4), `[p0,p1,p2,p2,p1,p0]` (3), `[p0,p1,p1,p0]` (2, adaptação do projeto).
 - **Rodada 1**: jogador inicial escolhe assentamento em interseção livre + estrada adjacente; demais seguem em sentido **horário**.
 - **Rodada 2**: quem foi último na rodada 1 começa; demais em sentido **anti-horário** (o jogador inicial da rodada 1 fecha a rodada 2).
 - **Recursos do 2º assentamento**: imediatamente após posicionar o 2º assentamento, o jogador recebe 1 carta de cada hex adjacente (deserto não produz). Nenhum recurso do 1º assentamento.
@@ -130,6 +131,7 @@ Observação: o índice de regras oficiais confirma o PDF acima como o manual ar
 11. **`boughtThisTurn` por carta; `playedActionCardThisTurn` por turno**; jogar carta comprada neste turno bloqueado; VP é exceção de vitória imediata.
 12. **Variantes fora de escopo**: mapa do iniciante, anti-aleatório letra-alfa, fase final de construção, expansões.
 13. **Taxa marítima multi-recurso**: em troca com o banco pedindo mais de um tipo, a taxa é a **soma por recurso** — `taxa = Σ_k want[k] × melhorTaxa(recurso recebido k)` e exige-se `sum(give) === taxa` (ex.: receber 1 grão com porto 2:1 + 1 lã sem porto = 2 + 4 = 6 cartas dadas).
+14. **Partidas com 2 jogadores**: fila snake `[p0,p1,p1,p0]`; mínimo de jogadores 2 (servidor impõe `NEED_PLAYERS` abaixo disso); máximo 4 inalterado.
 
 ## 5. Aviso
 

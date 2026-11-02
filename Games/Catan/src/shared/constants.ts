@@ -1,4 +1,4 @@
-// Constantes do Catan clássico (edição base 2020, 3–4 jogadores).
+// Constantes do Catan clássico (edição base 2020; projeto permite 2–4 jogadores).
 // Fonte: docs/rules.md. Projeto independente, não oficial.
 
 export type ResourceKind = 'brick' | 'lumber' | 'wool' | 'grain' | 'ore';
@@ -88,7 +88,7 @@ export const ISLAND_EXPECTED_EDGES = 72;
 export const ISLAND_HEX_COUNT = 19;
 export const PORT_COUNT = 9;
 
-export const MIN_PLAYERS = 3;
+export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem I/O/0/1

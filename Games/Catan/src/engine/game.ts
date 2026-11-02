@@ -33,9 +33,9 @@ function emptyResources(): PlayerState['resources'] {
 
 /**
  * Cria o estado inicial: fase setup_settlement, fila snake na ordem do array
- * ([p0,p1,p2,p3,p3,p2,p1,p0] para 4; [p0,p1,p2,p2,p1,p0] para 3), banco 19/recurso,
- * baralho de 25 embaralhado com a RNG injetada, peças 15/5/4, ladrão no deserto,
- * ofertas/histórico vazios, version 0, títulos sem dono.
+ * ([p0,p1,p2,p3,p3,p2,p1,p0] para 4; [p0,p1,p2,p2,p1,p0] para 3; [p0,p1,p1,p0] para 2),
+ * banco 19/recurso, baralho de 25 embaralhado com a RNG injetada, peças 15/5/4,
+ * ladrão no deserto, ofertas/histórico vazios, version 0, títulos sem dono.
  */
 export function createGame(opts: {
   players: { id: PlayerId; name: string; color: PlayerColor }[];
@@ -44,7 +44,7 @@ export function createGame(opts: {
 }): GameState {
   const { players, boardSeed, rng } = opts;
   if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
-    throw new Error(`createGame: 3–4 jogadores exigidos (recebidos: ${players.length})`);
+    throw new Error(`createGame: 2–4 jogadores exigidos (recebidos: ${players.length})`);
   }
   const board = generateBoard(boardSeed);
 
