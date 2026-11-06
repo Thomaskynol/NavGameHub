@@ -279,16 +279,16 @@ export function coversDevTrio(view: GameView): boolean {
   return DEV_TERRAINS.every((t) => covered.has(t));
 }
 
-/** Plano de troca marítima possível na mão atual (dev + troca cabem juntas). */
+/** Plano de troca marítima possível na mão atual (dev + troca cabem juntas; taxa clássica: vale pelo recurso ENTREGUE). */
 export function bankPlan(view: GameView): { give: ResourceKind; want: ResourceKind; rate: 2 | 3 | 4 } | null {
   const res = view.you.resources;
   if (res.wool < 1 || res.grain < 1 || res.ore < 1) return null; // reserva para desenvolvimento
   const total = handTotal(view);
   for (const want of RESOURCE_KINDS) {
-    const rate = bestBankRate(view, want);
-    if (total - 3 - rate + 1 < 8) continue; // pós dev+troca precisa ficar >7 (descarte do 7)
     for (const give of RESOURCE_KINDS) {
       if (give === want) continue;
+      const rate = bestBankRate(view, give);
+      if (total - 3 - rate + 1 < 8) continue; // pós dev+troca precisa ficar >7 (descarte do 7)
       const reserve = give === 'wool' || give === 'grain' || give === 'ore' ? 1 : 0;
       if (res[give] - reserve >= rate) return { give, want, rate };
     }

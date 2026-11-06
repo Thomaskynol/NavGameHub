@@ -163,7 +163,7 @@ describe('pontuação e títulos', () => {
     expect(publicVictoryPoints(s, 'p1')).toBe(0);
   });
 
-  it('bestBankRate: 4 padrão, 3 genérico, 2 especial; adversário não controla', () => {
+  it('bestBankRate: 4 padrão, 3 genérico, 2 especial (taxa para ENTREGAR); adversário não controla', () => {
     const s = scoreScenario();
     expect(bestBankRate(s, 'p0', 'ore')).toBe(4);
     const generic = s.board.ports.find((p) => p.kind === 'generic')!;

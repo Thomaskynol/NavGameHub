@@ -166,9 +166,9 @@ describe('partida completa (motor real)', () => {
       expect(st.roads.filter((r) => r.playerId === me).length).toBe(roadsBefore + 1);
     }
 
-    // troca bancária: usa a taxa real do motor (2:1 se porto de brick do setup)
+    // troca bancária: usa a taxa real do motor para ENTREGAR wool (2:1 com porto de wool)
     st = loadState(h, code);
-    const rate = realEngine.bestBankRate(st, me, 'brick');
+    const rate = realEngine.bestBankRate(st, me, 'wool');
     expect([2, 3, 4]).toContain(rate);
     const p0Hand = st.players.find((x) => x.id === me)!;
     if (p0Hand.resources.wool >= rate) {

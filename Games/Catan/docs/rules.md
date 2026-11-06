@@ -69,7 +69,7 @@ Observação: o índice de regras oficiais confirma o PDF acima como o manual ar
 ### 2.5 Trocas
 
 - **Doméstica**: sempre envolve o jogador da vez; demais não trocam entre si; sem doações; sem crédito; proibido mesmo recurso nos dois lados.
-- **Marítima**: 4:1 sempre; 3:1 com porto genérico; 2:1 com porto especial **apenas** para o recurso indicado.
+- **Marítima**: 4:1 sempre (4 iguais → 1 qualquer do banco); 3:1 com porto genérico (3 iguais → 1 qualquer); 2:1 com porto especial **apenas entregando** o recurso indicado (2 do recurso do porto → 1 qualquer). Cada lote é homogêneo no recurso entregue.
 - Cartas de desenvolvimento **não** são negociáveis.
 
 ### 2.6 Cartas de desenvolvimento
@@ -114,7 +114,7 @@ Observação: o índice de regras oficiais confirma o PDF acima como o manual ar
 | Cidade | 3 minério + 2 grão | 4 |
 | Desenvolvimento | 1 minério + 1 lã + 1 grão | monte de 25 |
 | Porto genérico 3:1 | assentamento/cidade na interseção do porto | — |
-| Porto especial 2:1 | idem; vale só para o tipo indicado | 1 por tipo |
+| Porto especial 2:1 | idem; vale só entregando o tipo indicado | 1 por tipo |
 
 ## 4. Decisões de adaptação digital
 
@@ -130,7 +130,7 @@ Observação: o índice de regras oficiais confirma o PDF acima como o manual ar
 10. **Vitória por VP**: servidor valida os pontos no ato da compra/revelação; manter ocultos apenas pontos de VP não revelados.
 11. **`boughtThisTurn` por carta; `playedActionCardThisTurn` por turno**; jogar carta comprada neste turno bloqueado; VP é exceção de vitória imediata.
 12. **Variantes fora de escopo**: mapa do iniciante, anti-aleatório letra-alfa, fase final de construção, expansões.
-13. **Taxa marítima multi-recurso**: em troca com o banco pedindo mais de um tipo, a taxa é a **soma por recurso** — `taxa = Σ_k want[k] × melhorTaxa(recurso recebido k)` e exige-se `sum(give) === taxa` (ex.: receber 1 grão com porto 2:1 + 1 lã sem porto = 2 + 4 = 6 cartas dadas).
+13. **Taxa marítima pelo recurso entregue (clássico)**: cada tipo entregue forma lotes homogêneos — `give[k]` precisa ser múltiplo exato da melhor taxa para entregar k (2 especial de k, 3 genérico, 4 padrão); cada lote rende 1 carta qualquer (`want` total = nº de lotes). `give` misto como lote único é rejeitado (ex.: 2 madeiras→1 grão com porto de grão é inválido; o desconto do porto de grão só vale entregando grão: 2 grãos→1 madeira). Troca multi-recurso = vários lotes num comando (ex.: com porto de grão, 2 grãos + 4 minérios → 2 cartas quaisquer).
 14. **Partidas com 2 jogadores**: fila snake `[p0,p1,p1,p0]`; mínimo de jogadores 2 (servidor impõe `NEED_PLAYERS` abaixo disso); máximo 4 inalterado.
 
 ## 5. Aviso

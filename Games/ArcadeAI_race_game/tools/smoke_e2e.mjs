@@ -4,6 +4,7 @@
 // → revanche → time trial com pausa. Falha != 0 se qualquer asserção quebrar.
 import { chromium } from 'playwright-core';
 import { startServer } from '../server/index.js';
+import { isLapConcluded, queryLapDone, queryResultRow } from './verify_lap.mjs';
 
 const EXE = process.env.CHROME_PATH || '/usr/bin/google-chrome';
 const SHOTS = process.env.SMOKE_SHOTS || '/tmp/av-smoke';
@@ -151,16 +152,10 @@ async function driveLap(page, { maxMs = 4_000, latT = 0 } = {}) {
   return st;
 }
 
-async function lapDone(page) {
-  return page.evaluate(() => {
-    const av = globalThis.__av;
-    const info = av?.info?.();
-    const sn = av?.lastSn?.();
-    if (!info || !sn || !info.you) return false;
-    const me = sn.cars?.find((c) => c.id === info.you);
-    return !!me && (info.laps == null ? false : me.lap >= info.laps);
-  });
-}
+// Guarda de conclusão: fonte única em ./verify_lap.mjs (lapDone/resultRow/
+// isLapConcluded compartilhados com dnf_check.mjs e flow8-arcade-natural.mjs).
+const lapDone = queryLapDone;
+const resultRow = queryResultRow;
 
 const run = async () => {
   // 1. servidor
@@ -275,7 +270,7 @@ const run = async () => {
   const dA = makeDriver(A, 0, 'A');
   const dB = makeDriver(B, -4, 'B');
   const t0 = Date.now();
-  let doneA = false, doneB = false;
+  let doneA = false, doneB = false, resultsOn = false;
   let maxVA = 0;
   let lastCheck = 0;
   while (Date.now() - t0 < 420_000) {
@@ -285,8 +280,11 @@ const run = async () => {
       lastCheck = Date.now();
       doneA = await lapDone(A);
       doneB = await lapDone(B);
-      // resultados podem aparecer (deadline/fin) sem lapDone em B
-      if (await A.getByText('Voltar ao lobby', { exact: true }).isVisible().catch(() => false)) { doneA = true; doneB = true; break; }
+      // Tela de resultados ≠ conclusão de volta: deadline/fin gera results com
+      // dnf (race.js onFirstFinish/finish). Só registra a tela e sai do loop,
+      // sem forçar doneA/doneB — a conclusão de A é provada abaixo (lap + row dnf=false).
+      resultsOn = await A.getByText('Voltar ao lobby', { exact: true }).isVisible().catch(() => false);
+      if (resultsOn) break;
     }
     if (doneA && doneB) break;
   }
@@ -294,14 +292,16 @@ const run = async () => {
   await dB.stop();
   for (const P of [A, B]) for (const k of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']) await P.keyboard.up(k).catch(() => {});
   ok(maxVA > 8, `A atingiu velocidade (${maxVA.toFixed(1)} m/s)`);
-  ok(doneA, 'volta de A concluída (lap via snapshot)');
   await shot(A, '02-corrida');
 
-  // 6. resultados
+  // 6. resultados (tela apareceu ≠ A concluiu)
   await A.getByText('Voltar ao lobby', { exact: true }).waitFor({ timeout: 120_000 });
   const names = await A.locator('.r-name').allInnerTexts().catch(() => []);
   ok(names.some((n) => n.includes('Ana')), `results contém Ana (${JSON.stringify(names)})`);
   ok(names.some((n) => n.includes('Bia')), `results contém Bia (${JSON.stringify(names)})`);
+  const rowA = await resultRow(A, 'Ana');
+  const concludedA = isLapConcluded(doneA, rowA);
+  ok(concludedA, `A concluiu volta sem DNF (lap + results dnf=false, tempo=${rowA?.total ?? '?'})`);
   await shot(A, '03-results');
 
   // 7. revanche → lobby

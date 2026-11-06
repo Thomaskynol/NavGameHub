@@ -18,6 +18,7 @@ import {
   createPlayerPhysics,
   distanceSq,
   explosionBlockedByWall,
+  inputMovement,
   obstaclesFor,
   powerupPointsFor,
   segmentCircleHit,
@@ -137,6 +138,14 @@ function idleInput(aim: number): PlayerInput {
   };
 }
 
+/** Velocidade efetiva de movimento: arma × speedBoost (1.5x) × gigante (0.9x).
+ *  Regra espelhada no preditor do cliente (predictor.ts effectiveSpeed,
+ *  alimentado pelo SelfState do snapshot): R4 exige as duas idênticas,
+ *  inclusive expiração e combinação — paridade coberta em r34-cardspeed.test.ts. */
+function effectiveMoveSpeed(weapon: WeaponType, speedBoost: number, giant: number): number {
+  return WEAPONS[weapon].speed * (speedBoost > 0 ? 1.5 : 1) * (giant > 0 ? 0.9 : 1);
+}
+
 export class Room {
   readonly code: string;
   /** Dono da partida no modo Hub (contrato htok, R2): opaco, só comparado
@@ -215,6 +224,13 @@ export class Room {
     this.endMatch();
   }
 
+  /** Hook de teste (HUB_TEST_HOOKS=1): inicia a escolha de cartas fora do
+   *  countdown de 60s. Só vale em playing; em outra fase é no-op. */
+  forceCardSelection(): void {
+    if (this.phase !== 'playing') return;
+    this.startCardSelection();
+  }
+
   addPlayer(client: RoomClient, name: string): ServerPlayer | null {
     if (this.isFull) return null;
 
@@ -273,6 +289,12 @@ export class Room {
     this.emptySince = null;
     this.spawnPlayer(player);
     this.emit({ type: 'join', name: player.name });
+
+    // R3: quem entra no meio da escolha participa (opções + tempo restante).
+    // Sem isso ele ficava mudo (sem carta no fim) e travava o fim antecipado.
+    if (this.phase === 'cardSelection') {
+      this.dealCardOptions(player);
+    }
 
     return player;
   }
@@ -334,6 +356,9 @@ export class Room {
     if (this.players.size < 2) {
       this.voting = false;
     }
+    // R3: saída no meio da escolha não prende os restantes no timeout: se
+    // todos os presentes já escolheram, termina na hora.
+    this.maybeFinishCardSelectionEarly();
   }
 
   handleInput(playerId: string, input: PlayerInput): void {
@@ -616,8 +641,7 @@ export class Room {
     }
 
     const input = queued ?? idleInput(player.physics.aim);
-    const baseSpeed = WEAPONS[player.weapon].speed;
-    const speed = baseSpeed * (player.speedBoost > 0 ? 1.5 : 1) * (player.giant > 0 ? 0.9 : 1);
+    const speed = effectiveMoveSpeed(player.weapon, player.speedBoost, player.giant);
     const obstacles = player.inDuel ? [] : this.activeObstacles();
     const dashReady = player.physics.dashCooldown <= 0 && player.physics.dashTime <= 0;
     stepPlayerPhysics(player.physics, input, dt, obstacles, speed);
@@ -633,9 +657,21 @@ export class Room {
     if (dashReady && player.physics.dashTime > 0 && player.cards.includes('dashInvis')) {
       player.invisible = 1.5;
     }
+    // Disparo de Dash (CARD_INFO): cada dash dispara uma espingarda na
+    // direção do dash (+1s no cooldown). fireShotgunAt é o helper dedicado.
+    if (dashReady && player.physics.dashTime > 0 && player.cards.includes('dashShot')) {
+      const movement = inputMovement(input);
+      const dashAngle = movement.active
+        ? Math.atan2(movement.y, movement.x)
+        : player.physics.aim;
+      this.fireShotgunAt(player, dashAngle);
+      player.physics.dashCooldown += 1;
+    }
     if (input.shoot && player.reloading <= 0 && player.ammo > 0) {
       player.shooting = true;
-      player.timeSinceLastShot = 0;
+      // Sem reset aqui: o timer zera ao decorar a bala emitida (decorateBullet).
+      // Resetar no tick do disparo — antes da decoração — anulava o chargedShot
+      // para sempre (L1-CARD-CHARGED).
     } else {
       player.timeSinceLastShot += dt;
     }
@@ -1035,7 +1071,8 @@ export class Room {
   }
 
   private explodeGrenade(grenade: Grenade): void {
-    const radius = GRENADE.explosionRadius;
+    // Raio por-granada (deathGrenade +30%) ou o padrão da constante.
+    const radius = grenade.explosionRadius ?? GRENADE.explosionRadius;
     const radiusSq = radius * radius;
     const shooter = this.players.get(grenade.owner);
 
@@ -1252,6 +1289,10 @@ export class Room {
         break;
       case 'duel': {
         if (player.inDuel) break;
+        // Iniciador já com countdown pendente não abre 2º duelo: sem isso a
+        // 2ª ativação sobrescrevia duelOrigin e o cancelamento largava o
+        // duelista fora do mapa (L1-DUEL-DBL).
+        if (this.pendingDuels.some((duel) => duel.a === player.id || duel.b === player.id)) break;
         const busy = new Set<string>();
         for (const duel of this.pendingDuels) {
           busy.add(duel.a);
@@ -1355,18 +1396,32 @@ export class Room {
     this.cardSelectionTimer = 10;
 
     for (const player of this.players.values()) {
-      const available = CARD_TYPES.filter((card) => !player.cards.includes(card));
-      const shuffled = [...available].sort(() => Math.random() - 0.5);
-      player.pendingCardOptions = shuffled.slice(0, 3);
-      player.chosenCard = null;
-      player.client.send({ t: 'cardSelection', cards: player.pendingCardOptions, seconds: 10 } as any);
+      this.dealCardOptions(player);
     }
+  }
+
+  /** Sorteia 3 opções e avisa o jogador com o tempo restante real (entrante
+   *  tardio recebe o que falta, não os 10s cheios). */
+  private dealCardOptions(player: ServerPlayer): void {
+    const available = CARD_TYPES.filter((card) => !player.cards.includes(card));
+    const shuffled = [...available].sort(() => Math.random() - 0.5);
+    player.pendingCardOptions = shuffled.slice(0, 3);
+    player.chosenCard = null;
+    player.client.send({
+      t: 'cardSelection',
+      cards: player.pendingCardOptions,
+      seconds: Math.max(1, Math.ceil(this.cardSelectionTimer)),
+    } as any);
   }
 
   private finishCardSelection(): void {
     for (const player of this.players.values()) {
-      if (!player.chosenCard && player.pendingCardOptions.length > 0) {
-        player.chosenCard = player.pendingCardOptions[Math.floor(Math.random() * player.pendingCardOptions.length)] ?? null;
+      if (!player.chosenCard) {
+        // Quem ficou mudo ganha carta sorteada: ninguém volta sem carta.
+        const pool = player.pendingCardOptions.length > 0
+          ? player.pendingCardOptions
+          : CARD_TYPES.filter((card) => !player.cards.includes(card));
+        player.chosenCard = pool[Math.floor(Math.random() * pool.length)] ?? null;
       }
       if (player.chosenCard) {
         this.applyCard(player, player.chosenCard);
@@ -1387,7 +1442,12 @@ export class Room {
     if (!player) return;
     if (!player.pendingCardOptions.includes(card as CardType)) return;
     player.chosenCard = card as CardType;
-    // Termina cedo quando todos já escolheram.
+    this.maybeFinishCardSelectionEarly();
+  }
+
+  /** Termina a escolha na hora quando todos os presentes já escolheram. */
+  private maybeFinishCardSelectionEarly(): void {
+    if (this.phase !== 'cardSelection' || this.players.size === 0) return;
     for (const other of this.players.values()) {
       if (!other.chosenCard) return;
     }
@@ -1424,6 +1484,11 @@ export class Room {
       bullet.vx *= 1.3;
       bullet.vy *= 1.3;
     }
+    // O disparo consome o timer (vale para a rajada do tick); sem isso o
+    // chargedShot ficaria ligado para sempre após os 2s (L1-CARD-CHARGED).
+    // Limite conhecido: na espingarda, só o 1º cartucho da rajada leva o
+    // bônus (os demais decoram com o timer já zerado).
+    shooter.timeSinceLastShot = 0;
   }
 
   private updateBullets(dt: number): void {

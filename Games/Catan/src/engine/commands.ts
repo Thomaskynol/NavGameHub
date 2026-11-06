@@ -417,6 +417,7 @@ function doFinishRoadBuilding(s: GameState, playerId: PlayerId): EngineResult {
 function doPlayMonopoly(s: GameState, playerId: PlayerId, resource: ResourceKind): EngineResult {
   const check = consumeDevCard(s, playerId, 'monopoly');
   if (!check.ok) return check;
+  s.returnPhase = s.phase; // pre_roll ou action (como knight/roadBuilding)
   const me = playerById(s, playerId) as PlayerState;
   for (const p of s.players) {
     if (p.id === playerId) continue;
@@ -440,6 +441,7 @@ function doPlayYearOfPlenty(s: GameState, playerId: PlayerId, resources: Resourc
   }
   const check = consumeDevCard(s, playerId, 'yearOfPlenty');
   if (!check.ok) return check;
+  s.returnPhase = s.phase; // pre_roll ou action (como knight/roadBuilding)
   const me = playerById(s, playerId) as PlayerState;
   const takes: ResourceKind[] = [];
   for (const r of resources) {
@@ -540,19 +542,30 @@ function doBankTrade(s: GameState, playerId: PlayerId, giveRaw: Patch, wantRaw: 
     if (s.bank[k] < v) return fail(ERROR_CODES.BANK_EMPTY, `O banco não tem ${v} de ${k}.`);
   }
   /**
-   * Decisão do projeto (taxa marítima multi-recurso): a taxa é SOMADA POR RECURSO PEDIDO.
-   * taxa = Σ_k want[k] * bestBankRate(s, playerId, k); exige-se sum(give) === taxa.
-   * Cada X:1 vale por recurso recebido (porto daquele recurso); exigir a melhor
-   * taxa única sobre o total puniria trocas mistas — decisão registrada em docs/rules.md §4.
+   * Regra clássica (taxa pelo recurso ENTREGUE): cada tipo em `give` forma
+   * lotes homogêneos — give[k] precisa ser múltiplo exato da melhor taxa para
+   * ENTREGAR k (2 porto especial de k, 3 genérico, senão 4). Cada lote rende
+   * 1 carta qualquer; o total de lotes precisa igualar o total pedido.
+   * `give` misto como lote único é rejeitado (ex.: 2 madeiras→1 grão com porto
+   * de grão — o desconto do porto de grão só vale entregando grão).
    */
-  const wantEntries = Object.entries(want) as [ResourceKind, number][];
-  const taxa = wantEntries.reduce((acc, [k, n]) => acc + n * bestBankRate(s, playerId, k), 0);
-  const giveTotal = patchTotal(give);
+  const giveEntries = Object.entries(give) as [ResourceKind, number][];
+  let lots = 0;
+  for (const [k, n] of giveEntries) {
+    const rate = bestBankRate(s, playerId, k);
+    if (n % rate !== 0) {
+      return fail(
+        ERROR_CODES.INVALID_TRADE,
+        `Troca marítima inválida: ${n} de ${k} não forma lote(s) de ${rate}:1 (a taxa vale pelo recurso entregue).`,
+      );
+    }
+    lots += n / rate;
+  }
   const wantTotal = patchTotal(want);
-  if (giveTotal !== taxa) {
+  if (lots !== wantTotal) {
     return fail(
       ERROR_CODES.INVALID_TRADE,
-      `Troca marítima inválida: ofereça ${taxa} carta(s) por ${wantTotal} (soma das taxas por recurso).`,
+      `Troca marítima inválida: ${lots} lote(s) entregue(s) para ${wantTotal} carta(s) pedida(s) (1 lote rende 1 carta).`,
     );
   }
   for (const [k, v] of Object.entries(give) as [ResourceKind, number][]) {

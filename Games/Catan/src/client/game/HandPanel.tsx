@@ -74,7 +74,7 @@ export function devCardState(
 export default function HandPanel({ view, youId }: { view: GameView; youId: string }) {
   const me = view.players.find((p) => p.id === youId);
   const res = view.you.resources;
-  const myRate = bestBankRate(view, 'lumber');
+  const myRate = Math.min(...RESOURCE_KINDS.map((k) => bestBankRate(view, k))) as 2 | 3 | 4;
 
   return (
     <div className="panel area-hand" style={{ overflowY: 'auto' }}>

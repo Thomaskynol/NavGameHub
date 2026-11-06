@@ -56,8 +56,8 @@ export function BankTradeModal({
 }) {
   const [giveRes, setGiveRes] = useState<ResourceKind>('lumber');
   const [wantRes, setWantRes] = useState<ResourceKind>('brick');
-  // Regra/servidor: a taxa vale por recurso RECEBIDO (soma por recurso do want).
-  const rate = bestBankRate(view, wantRes);
+  // Regra clássica/servidor: a taxa vale pelo recurso ENTREGUE (lote homogêneo).
+  const rate = bestBankRate(view, giveRes);
   const have = view.you.resources[giveRes];
   const bankHas = view.bankCounts[wantRes];
   const ok = have >= rate && giveRes !== wantRes && bankHas >= 1;
@@ -83,8 +83,8 @@ export function BankTradeModal({
       }
     >
       <p className="small muted" style={{ margin: 0 }}>
-        Com seus portos, a melhor taxa para receber {RES_NAME[wantRes]} é <b>{rate}:1</b>. Você tem {have} de{' '}
-        {RES_NAME[giveRes]}.
+        Com seus portos, entregar {RES_NAME[giveRes]} custa <b>{rate}:1</b> (lote de {rate} iguais → 1 carta
+        qualquer). Você tem {have} de {RES_NAME[giveRes]}.
       </p>
       <div className="col">
         <b>Você entrega ({rate} cartas):</b>
@@ -420,7 +420,8 @@ export function RulesModal({ onClose }: { onClose(): void }) {
         <section>
           <h3 style={{ margin: '0 0 8px' }}>Portos</h3>
           <p className="small" style={{ margin: 0, lineHeight: 1.7 }}>
-            4 portos genéricos dão taxa <b>3:1</b>; 5 portos especiais dão <b>2:1</b> só no recurso indicado.
+            4 portos genéricos dão taxa <b>3:1</b>; 5 portos especiais dão <b>2:1</b> entregando o recurso
+            indicado (2 cartas iguais daquele recurso → 1 carta qualquer do banco).
             Controle um porto construindo assentamento ou cidade em uma das duas interseções do cais.
             Sem porto, a taxa padrão é <b>4:1</b>.
           </p>

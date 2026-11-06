@@ -829,20 +829,29 @@ export function closeHubRoom(ctx: AppContext, rawCode: string, rawToken?: unknow
   } else if (provided !== '') {
     return { ok: false, error: 'FORBIDDEN' };
   }
+  // Coerência commit→memória→eventos: o banco confirma primeiro (só DB
+  // dentro da tx); memória e eventos só após o commit. Falha no DELETE
+  // desfaz o banco e preserva memória/sessões sem evento enganoso (retry ok).
   tx(ctx.db, () => {
-    for (const member of room.members.values()) {
-      const key = sessionKey(room.code, member.playerId);
-      const socket = ctx.sessions.get(key);
-      if (socket) {
-        ctx.sessions.delete(key);
-        socket.data.binding = null;
-        socket.emit('session_replaced', { by: member.playerId });
-      }
-      ctx.store.unindexMember(room, member);
-    }
     deleteRoomData(ctx.db, room.code);
   });
+  const members = [...room.members.values()];
+  const targets: { member: (typeof members)[number]; socket: AppSocket | undefined }[] = members.map((member) => ({
+    member,
+    socket: ctx.sessions.get(sessionKey(room.code, member.playerId)),
+  }));
+  for (const { member, socket } of targets) {
+    if (socket) {
+      const key = sessionKey(room.code, member.playerId);
+      if (ctx.sessions.get(key) === socket) ctx.sessions.delete(key);
+      socket.data.binding = null;
+    }
+    ctx.store.unindexMember(room, member);
+  }
   ctx.store.rooms.delete(room.code);
+  for (const { member, socket } of targets) {
+    if (socket) socket.emit('session_replaced', { by: member.playerId });
+  }
   logInfo('hub_room_closed', { roomCode: room.code });
   return { ok: true, closed: true };
 }

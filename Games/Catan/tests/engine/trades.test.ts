@@ -37,42 +37,83 @@ describe('trocas', () => {
     expect(s.bank.grain).toBe(19 - 1);
   });
 
-  it('porto genérico 3:1 e porto especial 2:1 (taxa vale para o recurso recebido)', () => {
+  it('porto genérico 3:1 e porto especial 2:1 (taxa vale para o recurso ENTREGUE)', () => {
     let s = tradeScenario();
     const genericPort = s.board.ports.find((p) => p.kind === 'generic')!;
     addBuilding(s, 'p0', genericPort.vertexIds[0], 'settlement');
     expect(bestBankRate(s, 'p0', 'ore')).toBe(3);
-    giveCards(s, 'p0', { lumber: 6 });
-    s = act(s, { type: 'bank_trade', give: { lumber: 3 }, want: { ore: 1 } }, makeRng('x'));
-    expect(s.players.find((p) => p.id === 'p0')!.resources.ore).toBe(1);
-    // porto especial grain => 2:1 para receber grão
+    // entrega 3 minérios a 3:1 (genérico) e recebe 1 carta qualquer
+    giveCards(s, 'p0', { ore: 3 });
+    s = act(s, { type: 'bank_trade', give: { ore: 3 }, want: { grain: 1 } }, makeRng('x'));
+    expect(s.players.find((p) => p.id === 'p0')!.resources.grain).toBe(1);
+    // porto especial de grão => 2:1 ENTREGANDO grão (2 grãos→1 madeira)
     const grainPort = s.board.ports.find((p) => p.kind === 'grain')!;
     addBuilding(s, 'p0', grainPort.vertexIds[1], 'settlement');
     expect(bestBankRate(s, 'p0', 'grain')).toBe(2);
-    expect(bestBankRate(s, 'p0', 'ore')).toBe(3); // ore continua 3 (genérico)
-    const lumberBefore = s.players.find((p) => p.id === 'p0')!.resources.lumber;
-    giveCards(s, 'p0', { lumber: 2 });
-    s = act(s, { type: 'bank_trade', give: { lumber: 2 }, want: { grain: 1 } }, makeRng('x'));
+    expect(bestBankRate(s, 'p0', 'ore')).toBe(3); // ore continua 3 (genérico, não o especial)
+    giveCards(s, 'p0', { grain: 2, lumber: 2 });
+    // 2 madeiras→1 grão REJEITADO: o desconto do porto de grão não vale recebendo grão
+    expectErr(
+      applyCommand(s, 'p0', { type: 'bank_trade', give: { lumber: 2 }, want: { grain: 1 } }, { rng: makeRng('x') }),
+      ERROR_CODES.INVALID_TRADE,
+    );
+    s = act(s, { type: 'bank_trade', give: { grain: 2 }, want: { lumber: 1 } }, makeRng('x'));
     const p0 = s.players.find((p) => p.id === 'p0')!;
-    expect(p0.resources.grain).toBe(1);
-    expect(p0.resources.lumber).toBe(lumberBefore); // 3 doadas +2 doadas -1? lumber: 6-3=3; +2=5; -2=3
+    expect(p0.resources.grain).toBe(1); // 1 da troca anterior + 2 - 2 entregues
+    expect(p0.resources.lumber).toBe(3); // 2 que tinha + 1 recebida
   });
 
-  it('multi-recurso: taxa somada por recurso pedido (docs/rules.md §4.13)', () => {
+  it('especial sem genérico: 2:1 só no recurso do porto; resto 4:1', () => {
+    let s = tradeScenario();
+    const orePort = s.board.ports.find((p) => p.kind === 'ore')!;
+    addBuilding(s, 'p0', orePort.vertexIds[0], 'settlement');
+    expect(bestBankRate(s, 'p0', 'ore')).toBe(2);
+    expect(bestBankRate(s, 'p0', 'grain')).toBe(4);
+    giveCards(s, 'p0', { ore: 2, grain: 6 });
+    // 2 minérios→1 grão (desconto do porto de minério, entregando minério)
+    s = act(s, { type: 'bank_trade', give: { ore: 2 }, want: { grain: 1 } }, makeRng('x'));
+    expect(s.players.find((p) => p.id === 'p0')!.resources.grain).toBe(7);
+    // 2 grãos→1 minério REJEITADO (sem porto de grão nem genérico, grão é 4:1)
+    expectErr(
+      applyCommand(s, 'p0', { type: 'bank_trade', give: { grain: 2 }, want: { ore: 1 } }, { rng: makeRng('x') }),
+      ERROR_CODES.INVALID_TRADE,
+    );
+    // 4 grãos→1 minério vale (4:1 padrão)
+    s = act(s, { type: 'bank_trade', give: { grain: 4 }, want: { ore: 1 } }, makeRng('x'));
+    expect(s.players.find((p) => p.id === 'p0')!.resources.ore).toBe(1);
+  });
+
+  it('multi-lotes: cada lote homogêneo obedece a taxa do recurso entregue', () => {
     let s = tradeScenario();
     const grainPort = s.board.ports.find((p) => p.kind === 'grain')!;
     addBuilding(s, 'p0', grainPort.vertexIds[0], 'settlement');
-    giveCards(s, 'p0', { ore: 8 });
-    // quer grão (2:1) + lã (4:1): taxa = 2*1 + 4*1 = 6 => give total 6
+    giveCards(s, 'p0', { grain: 6, ore: 8 });
+    // 4 grãos a 2:1 = 2 lotes → 2 cartas quaisquer
+    s = act(s, { type: 'bank_trade', give: { grain: 4 }, want: { lumber: 1, brick: 1 } }, makeRng('x'));
+    let p0 = s.players.find((p) => p.id === 'p0')!;
+    expect(p0.resources.lumber).toBe(1);
+    expect(p0.resources.brick).toBe(1);
+    expect(p0.resources.grain).toBe(2); // 6 - 4
+    // dois lotes de tipos distintos: 2 grãos (2:1) + 4 minérios (4:1) → 2 cartas
+    s = act(s, { type: 'bank_trade', give: { grain: 2, ore: 4 }, want: { wool: 2 } }, makeRng('x'));
+    p0 = s.players.find((p) => p.id === 'p0')!;
+    expect(p0.resources.wool).toBe(2);
+    expect(p0.resources.grain).toBe(0);
+    expect(p0.resources.ore).toBe(4); // 8 - 4
+    // inválidos: lote quebrado, nº de lotes ≠ nº pedido, give misto como lote único
+    giveCards(s, 'p0', { grain: 4 });
     expectErr(
-      applyCommand(s, 'p0', { type: 'bank_trade', give: { ore: 4 }, want: { grain: 1, wool: 1 } }, { rng: makeRng('x') }),
+      applyCommand(s, 'p0', { type: 'bank_trade', give: { grain: 3 }, want: { lumber: 1 } }, { rng: makeRng('x') }),
       ERROR_CODES.INVALID_TRADE,
     );
-    s = act(s, { type: 'bank_trade', give: { ore: 6 }, want: { grain: 1, wool: 1 } }, makeRng('x'));
-    const p0 = s.players.find((p) => p.id === 'p0')!;
-    expect(p0.resources.grain).toBe(1);
-    expect(p0.resources.wool).toBe(1);
-    expect(p0.resources.ore).toBe(2); // 8 - 6
+    expectErr(
+      applyCommand(s, 'p0', { type: 'bank_trade', give: { grain: 2 }, want: { lumber: 2 } }, { rng: makeRng('x') }),
+      ERROR_CODES.INVALID_TRADE,
+    );
+    expectErr(
+      applyCommand(s, 'p0', { type: 'bank_trade', give: { grain: 1, ore: 1 }, want: { lumber: 1 } }, { rng: makeRng('x') }),
+      ERROR_CODES.INVALID_TRADE,
+    );
   });
 
   it('doação e mesmo recurso proibidos; banco sem estoque; jogador sem cartas', () => {

@@ -106,9 +106,10 @@ export function totalVictoryPoints(state: GameState, playerId: PlayerId): number
 }
 
 /**
- * Melhor taxa marítima para RECEBER `resource`: 2 (porto especial do recurso),
- * 3 (porto genérico) ou 4 (padrão). Controle = construção própria em qualquer
- * um dos 2 vértices do porto; peça adversária no hex não bloqueia (FAQ).
+ * Melhor taxa marítima para ENTREGAR `resource`: 2 (porto especial do recurso),
+ * 3 (porto genérico) ou 4 (padrão). Cada lote homogêneo entregue rende 1 carta
+ * qualquer do banco. Controle = construção própria em qualquer um dos 2
+ * vértices do porto; peça adversária no hex não bloqueia (FAQ).
  */
 export function bestBankRate(state: GameState, playerId: PlayerId, resource: ResourceKind): 2 | 3 | 4 {
   let rate: 2 | 3 | 4 = 4;

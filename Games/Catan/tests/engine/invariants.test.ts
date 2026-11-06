@@ -50,7 +50,7 @@ describe('invariantes do motor', () => {
     // roda alguns turnos com trocas bancárias (respeita a taxa real do ator)
     for (let i = 0; i < 3; i++) {
       const actor = s.players[s.activeIndex].id;
-      const rate = bestBankRate(s, actor, 'grain');
+      const rate = bestBankRate(s, actor, 'ore'); // taxa para ENTREGAR ore
       giveCards(s, actor, { ore: rate });
       s = act(s, { type: 'roll_dice' }, diceRng(3, 2));
       s = act(s, { type: 'bank_trade', give: { ore: rate }, want: { grain: 1 } }, makeRng('t'));

@@ -88,8 +88,7 @@ meta_confere() { # pid metafile → 0 se o processo atual é o dono da instânci
   fi
   agora_start="$(proc_starttime "$pid")" || return 1
   [ "$agora_start" = "$m_start" ] || return 1
-  agora_cmd="$(proc_cmdline "$pid")" || return 1
-  [ "$agora_cmd" = "$m_cmd" ] || return 1
+  # cmdline não é exigido (wrappers mudam o título do processo).
   return 0
 }
 

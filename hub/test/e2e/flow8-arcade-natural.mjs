@@ -11,6 +11,9 @@ import {
   E2E, launchBrowser, strictCollector, shotPath, proofLine,
 } from './e2e-helpers.mjs';
 import { mkdirSync } from 'node:fs';
+// Guarda de conclusão compartilhada com o jogo (fonte única — o negativo
+// dnf_check.mjs exercita este MESMO código, não uma cópia).
+import { isLapConcluded, queryLapDone, queryResultRow } from '../../../Games/ArcadeAI_race_game/tools/verify_lap.mjs';
 
 proofLine('f8', 'play-real', 'corrida natural completa via Hub (1 volta, 2 pilotos reais, sem hook)');
 
@@ -96,16 +99,9 @@ function makeDriver(frame, page, latT = 0, tag = 'drv') {
   return { step, stop };
 }
 
-async function lapDone(frame) {
-  return frame.evaluate(() => {
-    const av = globalThis.__av;
-    const info = av?.info?.();
-    const sn = av?.lastSn?.();
-    if (!info || !sn || !info.you) return false;
-    const me = sn.cars?.find((c) => c.id === info.you);
-    return !!me && (info.laps == null ? false : me.lap >= info.laps);
-  }).catch(() => false);
-}
+// Leitura de conclusão via fonte única (../.../tools/verify_lap.mjs).
+const lapDone = queryLapDone;
+const resultRow = queryResultRow;
 
 async function newHubPage(browser, nick, strict) {
   const ctx = await browser.newContext();
@@ -215,7 +211,7 @@ try {
   const dA = makeDriver(frA, A, 0, 'A');
   const dB = makeDriver(frB, B, -4, 'B');
   const t0 = Date.now();
-  let doneA = false; let doneB = false;
+  let doneA = false; let doneB = false; let resultsOn = false;
   let maxVA = 0; let lastCheck = 0;
   while (Date.now() - t0 < 420_000) {
     if (!doneA) { const stA = await dA.step(); if (stA) maxVA = Math.max(maxVA, stA.v); }
@@ -224,9 +220,10 @@ try {
       lastCheck = Date.now();
       doneA = await lapDone(frA);
       doneB = await lapDone(frB);
-      if (await gfA.getByText('Voltar ao lobby', { exact: true }).isVisible().catch(() => false)) {
-        doneA = true; doneB = true; break;
-      }
+      // Tela de resultados ≠ conclusão de volta: deadline gera results com dnf
+      // (race.js onFirstFinish/finish). Só registra a tela e sai, sem forçar done.
+      resultsOn = await gfA.getByText('Voltar ao lobby', { exact: true }).isVisible().catch(() => false);
+      if (resultsOn) break;
     }
     if (doneA && doneB) break;
   }
@@ -235,14 +232,15 @@ try {
     await P.keyboard.up(k).catch(() => {});
   }
   check('A atingiu velocidade de corrida', maxVA > 8, `${maxVA.toFixed(1)} m/s`);
-  check('volta de A concluída (snapshot real)', doneA);
   await A.screenshot({ path: shotPath('f8-race-end.png') });
 
-  // Pódio natural (sem hook): tela de resultados dentro do iframe.
+  // Pódio natural (sem hook): tela de resultados dentro do iframe (tela ≠ conclusão).
   await gfA.getByText('Voltar ao lobby', { exact: true }).waitFor({ timeout: 120_000 });
   const names = await gfA.locator('.r-name').allInnerTexts().catch(() => []);
   check('results natural contém A', names.some((n) => n.includes(nickA.slice(0, 5))), JSON.stringify(names).slice(0, 120));
   check('results natural contém B', names.some((n) => n.includes(nickB.slice(0, 5))), JSON.stringify(names).slice(0, 120));
+  const rowA = await resultRow(frA, nickA.slice(0, 5));
+  check('A concluiu volta sem DNF (lap + results dnf=false)', isLapConcluded(doneA, rowA), `lap=${doneA} tempo=${rowA?.total ?? '?'}`);
   await A.screenshot({ path: shotPath('f8-results.png') });
 
   // Hub detecta o fim natural → graça (15s) → os 2 voltam à MESMA sala.

@@ -1,7 +1,7 @@
 // Tela de partida: tabuleiro + mão + painéis + barra de turno + fluxos de dev cards.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DevCardKind, HexId, PlayerId, ResourceKind, EdgeId, VertexId } from '../../shared/constants';
-import type { GameCommand } from '../../shared/protocol';
+import type { GameCommand, GameView } from '../../shared/protocol';
 import { useApp } from '../appContext';
 import { playSfx } from '../audio';
 import Board, { type BoardMode, type BoardPick } from '../board/Board';
@@ -37,6 +37,18 @@ export function gateRoadHighlights(legal: LegalTargets, canEnter: boolean): Lega
   return { ...legal, roadEdges: [], freeRoadEdges: [] };
 }
 
+/**
+ * Fase gratuita da Construção de Estradas como fonte da verdade (R2).
+ * O `buildMode` local é zerado pelo `send` após a 1ª free_road e se perde no
+ * reload — sem este gate o `boardMode` cai p/ none e a 2ª aresta não clica.
+ * O dono da pendência (quando exposto) evita abrir o modo p/ o adversário.
+ */
+export function isOwnFreeRoadPhase(view: Pick<GameView, 'phase' | 'pending'>, youId: string): boolean {
+  if (view.phase !== 'dev_road_building') return false;
+  const owner = view.pending?.playerId;
+  return owner === youId;
+}
+
 /** Ganhos da produção por delta da própria mão (só incrementos; gasto é ignorado). */
 export function productionGains(
   before: Record<ResourceKind, number>,
@@ -52,6 +64,30 @@ export function latestKindSeq(history: { seq: number; kind: string }[], kind: st
   let max = 0;
   for (const h of history) if (h.kind === kind && h.seq > max) max = h.seq;
   return max;
+}
+
+/**
+ * Contagem jogável por tipo p/ a TurnBar — espelha o servidor autoritativo
+ * (consumeDevCard: carta nova por id + 1 ação por turno) e a referência
+ * HandPanel.devCardState. Carta nova (boughtThisTurn) nunca conta; com carta
+ * antiga do mesmo tipo, só a antiga conta (×1); após 1 ação, nada conta.
+ * Motor (rules.md §2.4): carta de ação também é permitida antes dos dados.
+ */
+export function playableDevCounts(
+  view: Pick<GameView, 'phase' | 'activePlayerId' | 'you'>,
+  youId: string,
+): { kind: DevCardKind; n: number }[] {
+  if (view.activePlayerId !== youId) return [];
+  if (view.phase !== 'action' && view.phase !== 'pre_roll') return [];
+  if (view.you.playedActionCardThisTurn) return [];
+  const bought = new Set(view.you.boughtThisTurn);
+  const counts = new Map<DevCardKind, number>();
+  for (const c of view.you.devCards) {
+    if (c.kind === 'victoryPoint') continue;
+    if (bought.has(c.id)) continue;
+    counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([kind, n]) => ({ kind, n }));
 }
 
 interface TutorialFlow {
@@ -171,6 +207,8 @@ export default function Game({ mock = false }: { mock?: boolean }) {
       return { kind: 'edge', edges: legal.roadEdges, label: 'Escolha a aresta da estrada' };
     }
     if (buildMode === 'free_road') return { kind: 'edge', edges: legal.freeRoadEdges.length ? legal.freeRoadEdges : legal.roadEdges, label: 'Estrada gratuita' };
+    // R2: sobrevive ao send (que zera o buildMode) e ao reload — a fase da view decide.
+    if (isOwnFreeRoadPhase(view, youId)) return { kind: 'edge', edges: legal.freeRoadEdges.length ? legal.freeRoadEdges : legal.roadEdges, label: 'Estrada gratuita' };
     if (buildMode === 'settlement') return { kind: 'vertex', vertices: legal.settlementVertices, label: 'Escolha o local do assentamento' };
     if (buildMode === 'city') return { kind: 'vertex', vertices: legal.cityVertices, label: 'Escolha a casa para promover a cidade' };
     return { kind: 'none', label: '' };
@@ -221,7 +259,7 @@ export default function Game({ mock = false }: { mock?: boolean }) {
       if (!roadGateOpen || boardMode.kind !== 'edge') return;
       await send({ type: 'build_road', edgeId: selected.id as EdgeId }, 'place', 'build');
     }
-    if (buildMode === 'free_road') await send({ type: 'place_free_road', edgeId: selected.id as EdgeId }, 'place');
+    if (buildMode === 'free_road' || isOwnFreeRoadPhase(view, youId)) await send({ type: 'place_free_road', edgeId: selected.id as EdgeId }, 'place');
     if (buildMode === 'settlement') await send({ type: 'build_settlement', vertexId: selected.id as VertexId }, 'place', 'build');
     if (buildMode === 'city') await send({ type: 'build_city', vertexId: selected.id as VertexId }, 'thunk', 'build');
   };
@@ -235,24 +273,11 @@ export default function Game({ mock = false }: { mock?: boolean }) {
     playSfx('select');
   };
 
-  // ----- dev cards -----
-  // O GameView não expõe "já jogou ação este turno"; o servidor rejeita (DEV_ALREADY_PLAYED).
-  const isYourActionTurn = view.activePlayerId === youId && (view.phase === 'action' || view.phase === 'pre_roll');
-
-  const canPlayDev = (kind: DevCardKind): boolean => {
-    if (kind === 'victoryPoint') return false;
-    if (!isYourActionTurn) return false;
-    // Motor (rules.md §2.4): carta de ação também é permitida antes de rolar os dados.
-    return true;
-  };
-
-  const playableDevs = useMemo(() => {
-    const counts = new Map<DevCardKind, number>();
-    for (const c of view.you.devCards) {
-      if (canPlayDev(c.kind)) counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
-    }
-    return [...counts.entries()].map(([kind, n]) => ({ kind, n }));
-  }, [view.you.devCards, view.phase, view.activePlayerId, youId]);
+  // ----- dev cards (TurnBar espelha servidor + HandPanel; jogada vai pelo send) -----
+  const playableDevs = useMemo(
+    () => playableDevCounts(view, youId),
+    [view.you.devCards, view.you.boughtThisTurn, view.you.playedActionCardThisTurn, view.phase, view.activePlayerId, youId],
+  );
 
   const playDev = async (kind: DevCardKind) => {
     if (kind === 'knight') {
@@ -318,7 +343,7 @@ export default function Game({ mock = false }: { mock?: boolean }) {
           ? 'Coloque a estrada ao lado do assentamento recém-colocado.'
           : buildMode === 'road' || buildMode === 'settlement' || buildMode === 'city'
             ? 'Clique na posição destacada no tabuleiro e confirme.'
-            : buildMode === 'free_road'
+            : buildMode === 'free_road' || isOwnFreeRoadPhase(view, youId)
               ? 'Estradas gratuitas: clique nas arestas destacadas.'
               : buildMode === 'knight'
                 ? 'Cavaleiro: escolha o hex do ladrão.'

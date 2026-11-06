@@ -24,7 +24,7 @@ Reprodutibilidade: execuções repetidas do e2e verdes (5+ seguidas).
 - Setup snake (ida e volta), recursos do 2º assentamento.
 - Produção com escassez (2+ beneficiários com banco insuficiente → ninguém; 1 beneficiário → mínimo).
 - 7: descarte `floor(n/2)`, ladrão obrigatório, mudança de hex, vítima, roubo.
-- Trocas: banco 4:1, portos 3:1/2:1, taxa somada por recurso recebido.
+- Trocas: banco 4:1, portos 3:1/2:1, taxa pelo recurso entregue (lotes homogêneos).
 - Dev cards: cavaleiro, construção de estradas (fim antecipado <2 locais), monopólio, fartura (banco esgotado), VP na compra, `boughtThisTurn`/1 ação por turno.
 - Maior estrada (DFS sem repetir aresta, bloqueio adversário, empate) e maior exército.
 - Vitória aos 10 pontos.
@@ -47,7 +47,7 @@ Reprodutibilidade: execuções repetidas do e2e verdes (5+ seguidas).
 
 - Revisão independente (`code-reviewer`) sobre regras/autoridade/projeções/segurança: 12 achados (1 bloqueante, 1 alto, 5 médio, 5 baixo). **Todos corrigidos** (commits na mesma sessão de trabalho):
   - bloqueante: rehydrate do cliente congelava hints de setup/ladrão/estradas gratuitas → `GameView` agora expõe `setupQueue`/`setupPos`/`setupLastSettlementVertex` + `pending` completo;
-  - taxa marítima mista passou a somar `Σ want × taxa(recurso)` (registrado em `docs/rules.md` §4);
+  - taxa marítima valida lotes homogêneos pelo recurso entregue (decisão clássica, registrado em `docs/rules.md` §4);
   - `bind_session` passou a fazer broadcast de estado; rate limit de lobby; dev cards pré-roll liberados na UI conforme regra; produção sem destinatário-fantasma; docs; `lastRoll`/`PAYLOAD_LIMITS` mortos removidos; `baseVersion` obrigatório em `cmd`; transição lobby→jogo por `phase`.
 - Bug latente de geometria (associação hex↔vértice espelhada, 240 divergências em 5 seeds) encontrado pelo e2e, corrigido na raiz (`axialToCube(q, r)`) + 9 testes de regressão (`tests/client/geometry.test.ts`) — agora 0 divergências em 7 seeds.
 - Oracle de arquitetura indisponível no ambiente (2 falhas de tier) → substituído pela auditoria acima.

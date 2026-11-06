@@ -127,6 +127,26 @@ export function createRequestHandler(
       return;
     }
 
+    if (pathname === '/__hub/test/cards') {
+      if (!hubTestHooks) {
+        sendJson(res, 404, { ok: false, error: 'NOT_FOUND' });
+        return;
+      }
+      if (req.method !== 'POST') {
+        res.writeHead(405, { Allow: 'POST' });
+        res.end();
+        return;
+      }
+      const room = rooms ? rooms.get(code) : undefined;
+      if (!room) {
+        sendJson(res, 404, { ok: false, error: 'NOT_FOUND' });
+        return;
+      }
+      room.forceCardSelection();
+      sendJson(res, 200, { ok: true, phase: room.phase });
+      return;
+    }
+
     sendJson(res, 404, { ok: false, error: 'NOT_FOUND' });
   }
 
