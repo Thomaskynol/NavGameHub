@@ -139,12 +139,12 @@ if command -v python3 >/dev/null 2>&1; then
   cp "$REPO/start.sh" "$d/start.sh"
   mkdir -p "$d/Games/Catan/dist" "$d/Games/VAVA2D/packages/client/dist"
   touch "$d/Games/Catan/dist/server.mjs" "$d/Games/VAVA2D/packages/client/dist/index.html"
-  p1="$(porta_livre)"; p2="$(porta_livre)"; p3="$(porta_livre)"; p4="$(porta_livre)"
-  servir "$p1" && servir "$p2" && servir "$p3" && servir "$p4" || skip "R7: não deu para ocupar portas"
-  if porta_aberta "$p1" && porta_aberta "$p4"; then
-    out="$(HUB_PORT="$p1" ARCADE_PORT="$p2" VAVA_PORT="$p3" CATAN_PORT="$p4" START_TIMEOUT=5 bash "$d/start.sh" 2>&1)"; code=$?
+  p1="$(porta_livre)"; p2="$(porta_livre)"; p3="$(porta_livre)"; p4="$(porta_livre)"; p5="$(porta_livre)"
+  servir "$p1" && servir "$p2" && servir "$p3" && servir "$p4" && servir "$p5" || skip "R7: não deu para ocupar portas"
+  if porta_aberta "$p1" && porta_aberta "$p5"; then
+    out="$(HUB_PORT="$p1" ARCADE_PORT="$p2" VAVA_PORT="$p3" CATAN_PORT="$p4" NETWARS_PORT="$p5" START_TIMEOUT=5 bash "$d/start.sh" 2>&1)"; code=$?
     [ "$code" -ne 0 ] && ok "R7 conflito: exit != 0" || nok "R7 conflito: exit 0 indevido"
-    for par in "hub $p1 HUB_PORT" "arcade $p2 ARCADE_PORT" "vava $p3 VAVA_PORT" "catan $p4 CATAN_PORT"; do
+    for par in "hub $p1 HUB_PORT" "arcade $p2 ARCADE_PORT" "vava $p3 VAVA_PORT" "catan $p4 CATAN_PORT" "netwars $p5 NETWARS_PORT"; do
       set -- $par
       case "$out" in *"porta $2 ($1, $3)"*) ok "R7 conflito: $1 usa $3=$2";; *) nok "R7 conflito: $1 não honrou $3=$2";; esac
     done
@@ -163,14 +163,14 @@ if command -v python3 >/dev/null 2>&1; then
   case "$out" in *"ARCADE_PORT"*"inválida"*) ok "R10 NODE_VERSION exportado: gate do node passou";; *) nok "R10 NODE_VERSION exportado: node quebrou (saída: $out)";; esac
 fi
 # padrões anunciados (estrutural: defaults + export para o Hub)
-for par in "HUB_PORT 8090" "ARCADE_PORT 8091" "VAVA_PORT 8092" "CATAN_PORT 8093"; do
+for par in "HUB_PORT 8090" "ARCADE_PORT 8091" "VAVA_PORT 8092" "CATAN_PORT 8093" "NETWARS_PORT 8095"; do
   set -- $par
   if grep -q "$1=\"\${$1:-$2}\"" "$REPO/start.sh"; then ok "R7 padrão: $1=${2}"; else nok "R7 padrão: $1=${2} ausente"; fi
 done
-if grep -q 'export HUB_PORT ARCADE_PORT VAVA_PORT CATAN_PORT' "$REPO/start.sh"; then
-  ok "R7 export: Hub herda as 4 vars (contrato hub/games.json)"
+if grep -q 'export HUB_PORT ARCADE_PORT VAVA_PORT CATAN_PORT NETWARS_PORT' "$REPO/start.sh"; then
+  ok "R7 export: Hub herda as 5 vars (contrato hub/games.json)"
 else
-  nok "R7 export: faltou exportar as 4 vars"
+  nok "R7 export: faltou exportar as 5 vars"
 fi
 
 # --- t8 (R10): gate >= 22.13.0 com mínima + encontrada --------------------------

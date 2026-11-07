@@ -10,6 +10,7 @@ Este arquivo é a fonte de verdade compartilhada entre o servidor do Hub, a inte
 | Asfalto Vivo (Arcade) | 8091 | `GET /api/info` |
 | VAVA2D | 8092 | `GET /health` |
 | Catan Deluxe | 8093 | `GET /health` |
+| Net Wars | 8095 | `GET /health` |
 
 Todos escutam em `0.0.0.0`. O Hub monta a URL pública dos jogos a partir do host usado pelo navegador para abrir o Hub (cabeçalho `Host` do WebSocket, sem a porta) e da porta do manifesto. Nada de `localhost` fixo no cliente.
 

@@ -8,6 +8,7 @@
 #   arcade  ARCADE_PORT=8091  GET /api/info
 #   vava    VAVA_PORT=8092    GET /health
 #   catan   CATAN_PORT=8093   GET /health (produção: dist/server.mjs)
+#   netwars NETWARS_PORT=8095 GET /health
 #
 # Logs em .run/logs/<serviço>.log, PIDs em .run/pids/<serviço>.pid + .meta
 # (ID da instância + identidade do processo; ver stop.sh).
@@ -25,11 +26,12 @@ HUB_PORT="${HUB_PORT:-8090}"
 ARCADE_PORT="${ARCADE_PORT:-8091}"
 VAVA_PORT="${VAVA_PORT:-8092}"
 CATAN_PORT="${CATAN_PORT:-8093}"
+NETWARS_PORT="${NETWARS_PORT:-8095}"
 START_TIMEOUT="${START_TIMEOUT:-60}"
 REQUIRED_NODE="22.13.0"
-# Exporta de ponta a ponta: o Hub lê HUB_PORT/ARCADE_PORT/VAVA_PORT/CATAN_PORT
+# Exporta de ponta a ponta: o Hub lê HUB_PORT/ARCADE_PORT/VAVA_PORT/CATAN_PORT/NETWARS_PORT
 # do ambiente (fallback: hub/games.json); cada jogo recebe a sua via PORT.
-export HUB_PORT ARCADE_PORT VAVA_PORT CATAN_PORT
+export HUB_PORT ARCADE_PORT VAVA_PORT CATAN_PORT NETWARS_PORT
 
 say() { printf '%s\n' "$*"; }
 
@@ -102,6 +104,7 @@ n="HUB_PORT"; porta_valida "$n" "$HUB_PORT" || exit 1
 n="ARCADE_PORT"; porta_valida "$n" "$ARCADE_PORT" || exit 1
 n="VAVA_PORT"; porta_valida "$n" "$VAVA_PORT" || exit 1
 n="CATAN_PORT"; porta_valida "$n" "$CATAN_PORT" || exit 1
+n="NETWARS_PORT"; porta_valida "$n" "$NETWARS_PORT" || exit 1
 [ -f "$ROOT/Games/Catan/dist/server.mjs" ] \
   || { say "ERRO: build do Catan ausente (Games/Catan/dist/server.mjs). Rode 'bash prepare.sh' primeiro." >&2; exit 1; }
 [ -f "$ROOT/Games/VAVA2D/packages/client/dist/index.html" ] \
@@ -216,6 +219,7 @@ start_service "hub" "." "node hub/server.js" "$HUB_PORT" "/health" "HUB_PORT" ||
 start_service "arcade" "Games/ArcadeAI_race_game" "npm start --silent" "$ARCADE_PORT" "/api/info" "ARCADE_PORT" || true
 start_service "vava" "Games/VAVA2D" "npm start --silent --workspace @vava/server" "$VAVA_PORT" "/health" "VAVA_PORT" || true
 start_service "catan" "Games/Catan" "npm start --silent" "$CATAN_PORT" "/health" "CATAN_PORT" env NODE_ENV=production || true
+start_service "netwars" "Games/net_wars" "npm start --silent" "$NETWARS_PORT" "/health" "NETWARS_PORT" || true
 
 if [ "$FAILED" -ne 0 ]; then
   say "[start] FALHOU: nem todos os serviços subiram. Veja os logs em .run/logs/ e, se preciso, rode 'bash stop.sh'."

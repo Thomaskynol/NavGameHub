@@ -13,8 +13,9 @@ test('catálogo, /api/rooms, /health e proteção de caminho', async (t) => {
   const arcade = await startFakeGame({ id: 'arcade' });
   const vava = await startFakeGame({ id: 'vava' });
   const catan = await startFakeGame({ id: 'catan' });
+  const netwars = await startFakeGame({ id: 'netwars' });
   const { hub, port } = await startTestHub({
-    ports: { arcade: arcade.port, vava: vava.port, catan: catan.port },
+    ports: { arcade: arcade.port, vava: vava.port, catan: catan.port, netwars: netwars.port },
   });
   const clients = [];
 
@@ -30,6 +31,7 @@ test('catálogo, /api/rooms, /health e proteção de caminho', async (t) => {
     await arcade.close();
     await vava.close();
     await catan.close();
+    await netwars.close();
   });
 
   const a = await connectClient(port);
@@ -37,7 +39,7 @@ test('catálogo, /api/rooms, /health e proteção de caminho', async (t) => {
   await a.hello({ nick: 'Alice' });
 
   const catalog = await a.next((message) => message.t === 'catalog');
-  assert.equal(catalog.games.length, 3);
+  assert.equal(catalog.games.length, 4);
   assert.equal(catalog.games.every((game) => game.status === 'online'), true);
   assert.deepEqual(catalog.rooms, []);
   assert.deepEqual(Object.keys(catalog.games[0]).sort(), [

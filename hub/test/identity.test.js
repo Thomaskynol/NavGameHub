@@ -33,7 +33,7 @@ test('identidade: normalização NFKC, unicidade e reconexão com token', async 
   assert.match(helloA.token, /^[0-9a-f]{64}$/);
 
   const catalog = await a.next((message) => message.t === 'catalog');
-  assert.equal(catalog.games.length, 3);
+  assert.equal(catalog.games.length, 4);
   assert.ok(catalog.games.some((game) => game.id === 'arcade'));
   assert.deepEqual(catalog.rooms, []);
 

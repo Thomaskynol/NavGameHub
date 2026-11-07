@@ -61,6 +61,7 @@ install_deps "." "Game Hub (root)"
 install_deps "Games/ArcadeAI_race_game" "Asfalto Vivo (Arcade)"
 install_deps "Games/VAVA2D" "VAVA2D"
 install_deps "Games/Catan" "Catan Deluxe"
+install_deps "Games/net_wars" "Net Wars"
 
 # --- 3. builds de produção ----------------------------------------------------
 say "[prepare] gerando build do cliente VAVA2D ..."

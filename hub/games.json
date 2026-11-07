@@ -42,6 +42,20 @@
       "healthPath": "/health",
       "accent": "#ffc247",
       "tags": ["tabuleiro", "estratégia", "comércio"]
+    },
+    {
+      "id": "netwars",
+      "name": "Net Wars",
+      "tagline": "Combate espacial 3D",
+      "description": "Batalha de naves 3D para até doze pilotos, com modos FFA, equipes e survival, lobby com prontidão e início pelo anfitrião.",
+      "minPlayers": 2,
+      "maxPlayers": 12,
+      "midMatchJoin": false,
+      "codeLength": 6,
+      "port": 8095,
+      "healthPath": "/health",
+      "accent": "#7df9ff",
+      "tags": ["espacial", "3D", "combate"]
     }
   ]
 }
