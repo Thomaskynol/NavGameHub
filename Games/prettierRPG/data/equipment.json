@@ -1,0 +1,2626 @@
+{
+  "meta": {
+    "tier": "T8",
+    "quality": "Normal",
+    "enchantment": 0,
+    "ip": 1100,
+    "baseHp": 1200,
+    "baseEnergy": 120,
+    "snapshot": "Dragonfire Patch 4 (nov/2026)",
+    "date": "2026-11-05",
+    "precedence": "produto > 3o levantamento > 2o levantamento > historico 2025"
+  },
+  "items": [
+    {
+      "id": "battleaxe",
+      "name": "Machado de Batalha do Ancião",
+      "en": "Elder's Battleaxe",
+      "slot": "weapon",
+      "hands": 1,
+      "stats": {
+        "aa": 98,
+        "aaSpeed": 1.1,
+        "dps": 108,
+        "range": 3,
+        "ap": 138,
+        "maxHp": 95,
+        "hpRegenPct": 5
+      },
+      "skills": {
+        "q": [
+          "rending-strike",
+          "rending-spin",
+          "rending-rage"
+        ],
+        "w": [
+          "deadly-chop",
+          "adrenaline-boost",
+          "battle-rush",
+          "internal-bleeding",
+          "raging-blades"
+        ],
+        "e": [
+          "blood-bandit"
+        ],
+        "passive": [
+          "deep-cuts",
+          "life-leech",
+          "increased-defense",
+          "aggressive-rush"
+        ]
+      }
+    },
+    {
+      "id": "dagger",
+      "name": "Adaga do Ancião",
+      "en": "Elder's Dagger",
+      "slot": "weapon",
+      "hands": 1,
+      "stats": {
+        "aa": 55,
+        "aaSpeed": 2.0,
+        "dps": 110,
+        "range": 2,
+        "ap": 144
+      },
+      "skills": {
+        "q": [
+          "sunder-armor",
+          "deadly-swipe",
+          "assassin-spirit"
+        ],
+        "w": [
+          "throwing-blades",
+          "dash",
+          "forbidden-stab",
+          "shadow-edge",
+          "chain-slash"
+        ],
+        "e": [
+          "bloodthirsty-blade"
+        ],
+        "passive": [
+          "deep-cuts",
+          "life-leech",
+          "auto-attack-speed",
+          "aggressive-rush"
+        ]
+      }
+    },
+    {
+      "id": "fire-staff",
+      "name": "Cajado de Fogo do Ancião",
+      "en": "Elder's Fire Staff",
+      "slot": "weapon",
+      "hands": 1,
+      "stats": {
+        "aa": 53,
+        "aaSpeed": 1.35,
+        "dps": 71,
+        "range": 9,
+        "ap": 120
+      },
+      "skills": {
+        "q": [
+          "fire-bolt",
+          "burning-field",
+          "searing-flame"
+        ],
+        "w": [
+          "flame-blast",
+          "wall-of-flames",
+          "raging-flare",
+          "fire-wave",
+          "fire-artillery"
+        ],
+        "e": [
+          "pyroblast"
+        ],
+        "passive": [
+          "burn",
+          "energetic",
+          "aggressive-caster",
+          "furious"
+        ]
+      }
+    },
+    {
+      "id": "frost-staff",
+      "name": "Cajado de Gelo do Ancião",
+      "en": "Elder's Frost Staff",
+      "slot": "weapon",
+      "hands": 1,
+      "stats": {
+        "aa": 53,
+        "aaSpeed": 1.35,
+        "dps": 71,
+        "range": 9,
+        "ap": 120
+      },
+      "skills": {
+        "q": [
+          "frostbite",
+          "ice-shard",
+          "frozen-surge"
+        ],
+        "w": [
+          "frost-bomb",
+          "frost-beam",
+          "frost-nova",
+          "frost-lance",
+          "glacial-obelisk"
+        ],
+        "e": [
+          "freezing-wind"
+        ],
+        "passive": [
+          "frost",
+          "energetic",
+          "aggressive-caster",
+          "furious"
+        ]
+      }
+    },
+    {
+      "id": "holy-staff",
+      "name": "Cajado Sagrado do Ancião",
+      "en": "Elder's Holy Staff (T8_MAIN_HOLYSTAFF, básico)",
+      "slot": "weapon",
+      "hands": 1,
+      "stats": {
+        "aa": 53,
+        "aaSpeed": 1.35,
+        "dps": 71,
+        "range": 9,
+        "ap": 120
+      },
+      "skills": {
+        "q": [
+          "generous-heal",
+          "smite",
+          "holy-flash"
+        ],
+        "w": [
+          "sacred-pulse",
+          "holy-beam",
+          "holy-blessing",
+          "holy-orb",
+          "reawaken"
+        ],
+        "e": [
+          "desperate-prayer"
+        ],
+        "passive": [
+          "adrenaline-driven-charity",
+          "energetic",
+          "magic-force",
+          "ascended"
+        ]
+      }
+    },
+    {
+      "id": "shield",
+      "name": "Escudo do Ancião",
+      "en": "Elder's Shield",
+      "slot": "offhand",
+      "stats": {
+        "ccr": 50,
+        "defensePlayers": 5.2,
+        "defenseMobs": 5.2,
+        "threat": 20.5
+      },
+      "skills": {}
+    },
+    {
+      "id": "tome",
+      "name": "Tomo de Feitiços do Ancião (Rosalia's Diary, T8)",
+      "en": "Rosalia's Diary",
+      "slot": "offhand",
+      "stats": {
+        "maxEnergy": 29,
+        "enRegen": 0.37,
+        "castReduction": 2.1
+      },
+      "skills": {}
+    },
+    {
+      "id": "torch",
+      "name": "Tocha do Ancião",
+      "en": "Elder's Torch",
+      "slot": "offhand",
+      "stats": {
+        "aaSpeedPct": 12.3,
+        "cooldownRate": 0.6
+      },
+      "skills": {}
+    },
+    {
+      "id": "mercenary-hood",
+      "name": "Capuz de Mercenário do Ancião",
+      "en": "Elder's Mercenary Hood",
+      "slot": "head",
+      "stats": {
+        "maxHp": 269,
+        "maxEnergy": 98,
+        "hpRegen": 2.7,
+        "enRegen": 1.22
+      },
+      "skills": {
+        "active": [
+          "energizing-shield",
+          "cleanse",
+          "howl"
+        ],
+        "passive": [
+          "balanced-mind",
+          "swiftness",
+          "quick-thinker"
+        ]
+      }
+    },
+    {
+      "id": "mercenary-jacket",
+      "name": "Jaqueta de Mercenário do Ancião",
+      "en": "Elder's Mercenary Jacket",
+      "slot": "chest",
+      "stats": {
+        "armor": 188,
+        "magicResist": 188,
+        "ccr": 138,
+        "maxHp": 539,
+        "maxEnergy": 49,
+        "dmgBonus": 20,
+        "healBonus": 20,
+        "hpRegen": 5.4,
+        "hpRegenPct": 150,
+        "enRegen": 0.61,
+        "enRegenPct": 6,
+        "ccDuration": 20
+      },
+      "skills": {
+        "active": [
+          "mend-wounds",
+          "inferno-shield",
+          "bloodlust"
+        ],
+        "passive": [
+          "balanced-mind",
+          "swiftness",
+          "quick-thinker"
+        ]
+      }
+    },
+    {
+      "id": "mercenary-shoes",
+      "name": "Botas de Mercenário do Ancião",
+      "en": "Elder's Mercenary Shoes",
+      "slot": "boots",
+      "stats": {
+        "maxHp": 269,
+        "maxEnergy": 29,
+        "hpRegen": 2.7,
+        "enRegen": 0.37,
+        "carry": 59
+      },
+      "skills": {
+        "active": [
+          "dodge",
+          "refreshing-sprint",
+          "break-free"
+        ],
+        "passive": [
+          "courier",
+          "balanced-mind",
+          "swiftness",
+          "quick-thinker"
+        ]
+      }
+    },
+    {
+      "id": "soldier-helmet",
+      "name": "Elmo de Soldado do Ancião",
+      "en": "Elder's Soldier Helmet",
+      "slot": "head",
+      "stats": {
+        "maxHp": 269,
+        "maxEnergy": 98,
+        "hpRegen": 2.7,
+        "enRegen": 1.22
+      },
+      "skills": {
+        "active": [
+          "energizing-shield",
+          "stone-skin",
+          "block"
+        ],
+        "passive": [
+          "toughness",
+          "authority",
+          "tenacity"
+        ]
+      }
+    },
+    {
+      "id": "soldier-armor",
+      "name": "Armadura de Soldado do Ancião",
+      "en": "Elder's Soldier Armor",
+      "slot": "chest",
+      "stats": {
+        "armor": 236,
+        "magicResist": 193,
+        "ccr": 156,
+        "maxHp": 539,
+        "maxEnergy": 49,
+        "dmgBonus": 10,
+        "healBonus": 10,
+        "hpRegen": 5.4,
+        "hpRegenPct": 150,
+        "enRegen": 0.61,
+        "enRegenPct": 4,
+        "ccDuration": 40
+      },
+      "skills": {
+        "active": [
+          "mend-wounds",
+          "taunt",
+          "fury"
+        ],
+        "passive": [
+          "toughness",
+          "authority",
+          "tenacity"
+        ],
+        "passive2": [
+          "spirit-crush",
+          "protective-instinct"
+        ]
+      }
+    },
+    {
+      "id": "soldier-boots",
+      "name": "Botas de Soldado do Ancião",
+      "en": "Elder's Soldier Boots",
+      "slot": "boots",
+      "stats": {
+        "maxHp": 269,
+        "maxEnergy": 29,
+        "hpRegen": 2.7,
+        "enRegen": 0.37,
+        "carry": 59
+      },
+      "skills": {
+        "active": [
+          "dodge",
+          "rejuvenating-sprint",
+          "wanderlust"
+        ],
+        "passive": [
+          "courier",
+          "toughness",
+          "authority",
+          "tenacity"
+        ]
+      }
+    },
+    {
+      "id": "scholar-cowl",
+      "name": "Capuz de Erudito do Ancião",
+      "en": "Elder's Scholar Cowl (T8_HEAD_CLOTH_SET1)",
+      "slot": "head",
+      "stats": {
+        "maxHp": 269,
+        "maxEnergy": 98,
+        "hpRegen": 2.7,
+        "enRegen": 1.22
+      },
+      "skills": {
+        "active": [
+          "energizing-shield",
+          "force-field",
+          "aegis-of-energy"
+        ],
+        "passive": [
+          "aggression",
+          "concentration",
+          "efficiency"
+        ]
+      }
+    },
+    {
+      "id": "scholar-robe",
+      "name": "Túnica de Erudito do Ancião",
+      "en": "Elder's Scholar Robe (T8_ARMOR_CLOTH_SET1)",
+      "slot": "chest",
+      "stats": {
+        "armor": 133,
+        "magicResist": 159,
+        "ccr": 127,
+        "maxHp": 539,
+        "maxEnergy": 49,
+        "dmgBonus": 40,
+        "healBonus": 40,
+        "hpRegen": 5.4,
+        "hpRegenPct": 150,
+        "enRegen": 0.61,
+        "enRegenPct": 12
+      },
+      "skills": {
+        "active": [
+          "mend-wounds",
+          "frost-shield",
+          "speed-caster"
+        ],
+        "passive": [
+          "aggression",
+          "concentration",
+          "efficiency"
+        ]
+      }
+    },
+    {
+      "id": "scholar-sandals",
+      "name": "Sandálias de Erudito do Ancião",
+      "en": "Elder's Scholar Sandals (T8_SHOES_CLOTH_SET1)",
+      "slot": "boots",
+      "stats": {
+        "maxHp": 269,
+        "maxEnergy": 29,
+        "hpRegen": 2.7,
+        "enRegen": 0.37,
+        "carry": 59
+      },
+      "skills": {
+        "active": [
+          "dodge",
+          "energetic-sprint",
+          "focused-run"
+        ],
+        "passive": [
+          "courier",
+          "aggression",
+          "concentration",
+          "efficiency"
+        ]
+      }
+    },
+    {
+      "id": "cape-bridgewatch",
+      "name": "Capa de Bridgewatch do Ancião (Sandstorm)",
+      "en": "Elder's Bridgewatch Cape",
+      "slot": "cape",
+      "stats": {
+        "maxEnergy": 20,
+        "enRegen": 0.24
+      },
+      "skills": {
+        "passive": [
+          "sandstorm"
+        ]
+      }
+    },
+    {
+      "id": "cape-fort-sterling",
+      "name": "Capa de Fort Sterling do Ancião (Untouchable)",
+      "en": "Elder's Fort Sterling Cape",
+      "slot": "cape",
+      "stats": {
+        "maxEnergy": 20,
+        "enRegen": 0.24
+      },
+      "skills": {
+        "passive": [
+          "untouchable"
+        ]
+      }
+    },
+    {
+      "id": "cape-lymhurst",
+      "name": "Capa de Lymhurst do Ancião (Energy Reserve)",
+      "en": "Elder's Lymhurst Cape",
+      "slot": "cape",
+      "stats": {
+        "maxEnergy": 20,
+        "enRegen": 0.24
+      },
+      "skills": {
+        "passive": [
+          "energy-reserve"
+        ]
+      }
+    },
+    {
+      "id": "cape-martlock",
+      "name": "Capa de Martlock do Ancião (Shield of Protection)",
+      "en": "Elder's Martlock Cape",
+      "slot": "cape",
+      "stats": {
+        "maxEnergy": 20,
+        "enRegen": 0.24
+      },
+      "skills": {
+        "passive": [
+          "shield-of-protection"
+        ]
+      }
+    },
+    {
+      "id": "cape-thetford",
+      "name": "Capa de Thetford do Ancião (Chain Lightning)",
+      "en": "Elder's Thetford Cape",
+      "slot": "cape",
+      "stats": {
+        "maxEnergy": 20,
+        "enRegen": 0.24
+      },
+      "skills": {
+        "passive": [
+          "chain-lightning-cape"
+        ]
+      }
+    },
+    {
+      "id": "cape-caerleon",
+      "name": "Capa de Caerleon do Ancião (Reinício do 1º slot)",
+      "en": "Elder's Caerleon Cape",
+      "slot": "cape",
+      "stats": {
+        "maxEnergy": 20,
+        "enRegen": 0.24
+      },
+      "skills": {
+        "passive": [
+          "caerleon-reset"
+        ]
+      }
+    }
+  ],
+  "skills": [
+    {
+      "id": "rending-strike",
+      "name": "Rending Strike",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "q",
+      "target": "enemy",
+      "range": 3,
+      "radius": 0,
+      "cost": 2,
+      "cd": 2,
+      "cast": 0,
+      "channel": 0,
+      "duration": 6,
+      "effect": "195 físico + 1 carga de sangramento (máx 3); cada carga causa 83 físico total em 6s; com 3 cargas, alvo recebe -12% cura por 5s",
+      "formula": "dano direto 195 + 83 por carga (DoT 6s); mitigado por 100/(100+resistência)",
+      "source": "D.2 Battleaxe T8 IP1100",
+      "confidence": "media"
+    },
+    {
+      "id": "rending-spin",
+      "name": "Rending Spin",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "q",
+      "target": "area",
+      "range": 0,
+      "radius": 5,
+      "cost": 3,
+      "cd": 3,
+      "cast": 0,
+      "channel": 0,
+      "duration": 6,
+      "effect": "231 físico a 2,5m e 264 na borda (5m); aplica 1 carga de sangramento em cada inimigo",
+      "formula": "231/264 por distância + 83 por carga (DoT 6s)",
+      "source": "D.2 Battleaxe T8 IP1100",
+      "confidence": "media"
+    },
+    {
+      "id": "rending-rage",
+      "name": "Rending Rage",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "q",
+      "target": "direction",
+      "range": 9,
+      "radius": 0,
+      "cost": 4,
+      "cd": 1.2,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "combo de 3 etapas em cone (reseta em 2,5s): etapas 1-2, cone 3m, 165 físico + 1 carga; 3ª etapa salta ao ponto até 9m, 165 físico + root em raio 5m por 1,61s",
+      "formula": "165 por etapa + 83 por carga; root 1,61s reduzido por CCR",
+      "source": "D.2/B.3 Battleaxe",
+      "confidence": "baixa",
+      "approx": "custos por etapa não recuperados; adotado 4 por etapa e CD 1,2s por etapa (hipótese); cone ~60°/3m e salto com deslize anti-obstáculo são aproximações testáveis (§B); janela combo 2,5s confirmada (D.2)"
+    },
+    {
+      "id": "deadly-chop",
+      "name": "Deadly Chop",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "w",
+      "target": "enemy",
+      "range": 3,
+      "radius": 0,
+      "cost": 8,
+      "cd": 15,
+      "cast": 0.4,
+      "channel": 0,
+      "duration": 8,
+      "effect": "502 físico; reduz resistências do alvo em 16% por 8s",
+      "formula": "502 mitigado por 100/(100+resistência); debuff -16% resistência",
+      "source": "D.2 Battleaxe T8 IP1100",
+      "confidence": "media"
+    },
+    {
+      "id": "adrenaline-boost",
+      "name": "Adrenaline Boost",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "w",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 30,
+      "cd": 20,
+      "cast": 0,
+      "channel": 0,
+      "duration": 9,
+      "effect": "+25% dano, +40% movimento e +40% velocidade de AA por até 9s; termina após 3s sem causar dano direto",
+      "formula": "multiplicadores sobre dano/movimento/AA durante o buff",
+      "source": "D.2 Battleaxe",
+      "confidence": "media"
+    },
+    {
+      "id": "battle-rush",
+      "name": "Battle Rush",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "w",
+      "target": "ground",
+      "range": 12,
+      "radius": 5,
+      "cost": 36,
+      "cd": 18,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "dash até o ponto; inimigos próximos: -20% cura recebida por 3s; até 5 aliados próximos: +20% cura recebida por 4s",
+      "formula": "sem dano direto; modificadores de Healing Received",
+      "source": "D.2 Battleaxe",
+      "confidence": "media"
+    },
+    {
+      "id": "internal-bleeding",
+      "name": "Internal Bleeding",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "w",
+      "target": "area",
+      "range": 0,
+      "radius": 6,
+      "cost": 26,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 8,
+      "effect": "193 físico direto; alvos que se movem sangram 66 físico a cada 0,5s por até 8s",
+      "formula": "193 + até 16 ticks de 66 (só em movimento)",
+      "source": "D.2/B.3 Battleaxe",
+      "confidence": "media"
+    },
+    {
+      "id": "raging-blades",
+      "name": "Raging Blades",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "w",
+      "target": "area",
+      "range": 0,
+      "radius": 5,
+      "cost": 30,
+      "cd": 12,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "aura 3s; duas lâminas causam 73 mágico a cada 0,5s; por inimigo distinto atingido, +4% dano até 10 cargas (buff 3s)",
+      "formula": "73 por tick + buff de dano por inimigo distinto",
+      "source": "D.2 Battleaxe",
+      "confidence": "media"
+    },
+    {
+      "id": "blood-bandit",
+      "name": "Blood Bandit",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "e",
+      "target": "direction",
+      "range": 17,
+      "radius": 0,
+      "cost": 40,
+      "cd": 10,
+      "cast": 0,
+      "channel": 0,
+      "duration": 9,
+      "effect": "2 etapas direcionais (combo reseta em 9s): etapa 1 causa 528/627/726/825 físico conforme 0/1/2/3 cargas; etapa 2 causa 363 físico e cura 110/177/243/331 conforme cargas do primeiro inimigo",
+      "formula": "dano por cargas + cura etapa 2; mitigado por resistência",
+      "source": "D.2/B.3 Battleaxe",
+      "confidence": "media"
+    },
+    {
+      "id": "sunder-armor",
+      "name": "Sunder Armor",
+      "items": [
+        "dagger"
+      ],
+      "slot": "q",
+      "target": "enemy",
+      "range": 2,
+      "radius": 0,
+      "cost": 3,
+      "cd": 2,
+      "cast": 0,
+      "channel": 0,
+      "duration": 8,
+      "effect": "230 físico; cargas por 8s reduzem resistências -4% vs players / -6% vs mobs; até 3 cargas",
+      "formula": "230 + debuff de resistência por carga",
+      "source": "D.3 Dagger T8",
+      "confidence": "media"
+    },
+    {
+      "id": "deadly-swipe",
+      "name": "Deadly Swipe",
+      "items": [
+        "dagger"
+      ],
+      "slot": "q",
+      "target": "ground",
+      "range": 4.5,
+      "radius": 3,
+      "cost": 9,
+      "cd": 4,
+      "cast": 0,
+      "channel": 0,
+      "duration": 8,
+      "effect": "salta ao ponto (4,5m), 258 físico em 3m; +1 carga Assassin Spirit por inimigo; acertando ao menos um, restaura 21 energia; cada carga +6% dano por 8s (máx 3)",
+      "formula": "258 em área + buff de dano por carga",
+      "source": "D.3 Dagger",
+      "confidence": "media"
+    },
+    {
+      "id": "assassin-spirit",
+      "name": "Assassin Spirit",
+      "items": [
+        "dagger"
+      ],
+      "slot": "q",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 6,
+      "cd": 1,
+      "cast": 0,
+      "channel": 0,
+      "duration": 15,
+      "effect": "toggle até 15s: gera 1 carga a cada 2s; -4% Defense própria; cada carga +6% dano por 8s (máx 3)",
+      "formula": "buff de dano por carga; custo de -4% Defense",
+      "source": "D.3 Dagger",
+      "confidence": "media"
+    },
+    {
+      "id": "throwing-blades",
+      "name": "Throwing Blades",
+      "items": [
+        "dagger"
+      ],
+      "slot": "w",
+      "target": "direction",
+      "range": 12,
+      "radius": 0,
+      "cost": 11,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "cone de 3 lâminas perfurantes, 207 físico; por inimigo único atingido, +15% movimento e +10% dano por 5s (até 3 stacks)",
+      "formula": "207 por alvo + buffs por inimigo distinto",
+      "source": "D.3 Dagger",
+      "confidence": "baixa",
+      "approx": "unidade do 207 (por lâmina ou total) não confirmada; adotado por alvo"
+    },
+    {
+      "id": "dash",
+      "name": "Dash",
+      "items": [
+        "dagger"
+      ],
+      "slot": "w",
+      "target": "ground",
+      "range": 8,
+      "radius": 0,
+      "cost": 1,
+      "cd": 23.5,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "dash até o ponto (8m); +15% dano por 4s após o dash",
+      "formula": "sem dano direto; buff +15% dano",
+      "source": "D.3 Dagger",
+      "confidence": "baixa",
+      "approx": "custo 0,08 e CD 23,5s vêm de campo bruto; adotado custo 1 e CD 23,5s (hipótese)"
+    },
+    {
+      "id": "forbidden-stab",
+      "name": "Forbidden Stab",
+      "items": [
+        "dagger"
+      ],
+      "slot": "w",
+      "target": "enemy",
+      "range": 2,
+      "radius": 0,
+      "cost": 24,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 1.5,
+      "effect": "290 físico; interrompe conjuração; nega Healing Received por 1,5s",
+      "formula": "290 mitigado; cura do alvo zerada por 1,5s",
+      "source": "D.3 Dagger (parcial alto)",
+      "confidence": "alta"
+    },
+    {
+      "id": "shadow-edge",
+      "name": "Shadow Edge",
+      "items": [
+        "dagger"
+      ],
+      "slot": "w",
+      "target": "direction",
+      "range": 22,
+      "radius": 0,
+      "cost": 41,
+      "cd": 20,
+      "cast": 0,
+      "channel": 0,
+      "duration": 1.68,
+      "effect": "projétil 22m; no primeiro inimigo, teleporta para trás dele; stun ~1,68s em player; -25% CD se acertar player; imune a CC/debuff durante o deslocamento",
+      "formula": "stun 1,68s reduzido por CCR",
+      "source": "D.3 Dagger",
+      "confidence": "media"
+    },
+    {
+      "id": "chain-slash",
+      "name": "Chain Slash",
+      "items": [
+        "dagger"
+      ],
+      "slot": "w",
+      "target": "enemy",
+      "range": 6,
+      "radius": 7,
+      "cost": 9,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "salta entre inimigos (máx 3 alvos, saltos até 7m); dano 379/482/689 por impactos 1/2/3; invisível e imune a dano durante os saltos",
+      "formula": "dano por impacto da sequência",
+      "source": "D.3/B Dagger Chain Slash",
+      "confidence": "media"
+    },
+    {
+      "id": "bloodthirsty-blade",
+      "name": "Bloodthirsty Blade",
+      "items": [
+        "dagger"
+      ],
+      "slot": "e",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 48,
+      "cd": 20,
+      "cast": 0,
+      "channel": 0,
+      "duration": 6,
+      "effect": "buff toggle até 6s: cada AA soma 172 mágico vs player / 103 vs mob e rouba 100% da vida removida por esse bônus; +30% movimento; auto-dano verdadeiro -2,5% vida máxima por 1s",
+      "formula": "bônus mágico por AA + lifesteal 100% do bônus; auto-dano verdadeiro ignora defesa",
+      "source": "D.3 Dagger (parcial alto)",
+      "confidence": "alta"
+    },
+    {
+      "id": "fire-bolt",
+      "name": "Fire Bolt",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "q",
+      "target": "enemy",
+      "range": 13,
+      "radius": 0,
+      "cost": 9,
+      "cd": 0,
+      "cast": 0.8,
+      "channel": 0,
+      "duration": 4,
+      "effect": "projétil: 178 mágico direto + burn 57 total em 4s; até 5 cargas",
+      "formula": "178 + burn 57/4s por carga",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "burning-field",
+      "name": "Burning Field",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "q",
+      "target": "ground",
+      "range": 15,
+      "radius": 3,
+      "cost": 6,
+      "cd": 4,
+      "cast": 0.5,
+      "channel": 0,
+      "duration": 4,
+      "effect": "201 mágico no impacto; campo 4s causa 158 mágico/0,5s vs player ou 57 vs mob; não refletível",
+      "formula": "201 + ticks de campo por 4s",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "searing-flame",
+      "name": "Searing Flame",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "q",
+      "target": "direction",
+      "range": 20,
+      "radius": 0,
+      "cost": 14,
+      "cd": 1.5,
+      "cast": 0.4,
+      "channel": 0,
+      "duration": 4,
+      "effect": "combo direcional de 3 acertos + finalizador (reseta 5s): 284 mágico + burn 126/4s por acerto; finalizador 574 + burn 126; precisa acertar para continuar",
+      "formula": "284 por acerto, 574 finalizador, + burn 126/4s",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "flame-blast",
+      "name": "Flame Blast",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "w",
+      "target": "enemy",
+      "range": 11,
+      "radius": 5,
+      "cost": 23,
+      "cd": 12,
+      "cast": 0,
+      "channel": 0,
+      "duration": 1.6,
+      "effect": "alvo pode ser inimigo, aliado ou self; explosão após 1,6s em 5m: 402 mágico em inimigos; primário inimigo +115 imediato; primário aliado/self +60% movimento por 1,6s",
+      "formula": "402 em área + 115 no primário inimigo",
+      "source": "D.4 Fire Staff (parcial alto)",
+      "confidence": "alta"
+    },
+    {
+      "id": "wall-of-flames",
+      "name": "Wall of Flames",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "w",
+      "target": "direction",
+      "range": 0,
+      "radius": 7,
+      "cost": 43,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "parede frontal 5s (largura 14m): toque aplica burn 417 mágico total/4s, não refletível; inimigos recuam 0,5s",
+      "formula": "burn 417/4s por contato",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "raging-flare",
+      "name": "Raging Flare",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "w",
+      "target": "direction",
+      "range": 22,
+      "radius": 5,
+      "cost": 46,
+      "cd": 20,
+      "cast": 0.4,
+      "channel": 0,
+      "duration": 3,
+      "effect": "projétil direcional que explode (5m): 588 mágico + burn 184 total/3s",
+      "formula": "588 + burn 184/3s",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "fire-wave",
+      "name": "Fire Wave",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "w",
+      "target": "cone",
+      "range": 12,
+      "radius": 0,
+      "cost": 34,
+      "cd": 12,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "cone frontal 12m: 497 mágico + 201 se alvo sob Fire Bolt/Burning Field/Searing Flame; knockback ~5,59m",
+      "formula": "497 (+201 condicional)",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "fire-artillery",
+      "name": "Fire Artillery",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "w",
+      "target": "enemy",
+      "range": 18,
+      "radius": 3,
+      "cost": 46,
+      "cd": 15,
+      "cast": 1.5,
+      "channel": 3,
+      "duration": 6,
+      "effect": "canaliza orbes (1 a cada 1,5s): cada orbe 158 mágico em 3m; área de fogo 6s com DoT 43 vs player / 16 vs mob a cada 0,5s, até 4 stacks, não refletível",
+      "formula": "158 por orbe + DoT por stack",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "pyroblast",
+      "name": "Pyroblast",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "e",
+      "target": "enemy",
+      "range": 15,
+      "radius": 4,
+      "cost": 43,
+      "cd": 15,
+      "cast": 0,
+      "channel": 1.2,
+      "duration": 0,
+      "effect": "carrega até 1,2s e explode (4m): 402/689/976 mágico em 0/0,6/1,2s; canal completo empurra 3,5m",
+      "formula": "dano por estágio de carga",
+      "source": "D.4 Fire Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "frostbite",
+      "name": "Frostbite",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "q",
+      "target": "direction",
+      "range": 18,
+      "radius": 0,
+      "cost": 14,
+      "cd": 1.2,
+      "cast": 0.3,
+      "channel": 0,
+      "duration": 3,
+      "effect": "293 mágico; 1 carga por 3s (máx 3); na 3ª carga, stun ~1,12s",
+      "formula": "293 + stun na 3ª carga",
+      "source": "D.5 Frost Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "ice-shard",
+      "name": "Ice Shard",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "q",
+      "target": "ground",
+      "range": 14,
+      "radius": 3,
+      "cost": 8,
+      "cd": 0,
+      "cast": 1.2,
+      "channel": 0,
+      "duration": 0,
+      "effect": "373 mágico vs player / 258 vs mob em 3m",
+      "formula": "dano em área com split PvP/PvE",
+      "source": "D.5 Frost Staff",
+      "confidence": "baixa",
+      "approx": "custo atual não confirmado; adotado 8 (hipótese)"
+    },
+    {
+      "id": "frozen-surge",
+      "name": "Frozen Surge",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "q",
+      "target": "ground",
+      "range": 16,
+      "radius": 1.9,
+      "cost": 14,
+      "cd": 3,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "faixa frontal 16m (largura 3,8m): 258 mágico + slow 20% por 3s",
+      "formula": "258 + slow 20%/3s",
+      "source": "D.5 Frost Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "frost-bomb",
+      "name": "Frost Bomb",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "w",
+      "target": "ground",
+      "range": 11,
+      "radius": 5,
+      "cost": 29,
+      "cd": 10,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "slow inicial 30% em 5m; explode após 1,6s: 477 mágico em 5m + slow 20% por 5s",
+      "formula": "477 + slows por fase",
+      "source": "D.5 Frost Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "frost-beam",
+      "name": "Frost Beam",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "w",
+      "target": "enemy",
+      "range": 12,
+      "radius": 4,
+      "cost": 37,
+      "cd": 15,
+      "cast": 0,
+      "channel": 2.7,
+      "duration": 2,
+      "effect": "canal até 2,7s: 90 mágico a cada 0,3s; cada tick aplica slow e -15% velocidade de AA (máx 5, dura 2s após canal)",
+      "formula": "90 por tick (até 9 ticks)",
+      "source": "D.5 Frost Staff",
+      "confidence": "baixa",
+      "approx": "raio de dano 4m vs raio de debuff 5m em conflito; adotado 4m p/ dano"
+    },
+    {
+      "id": "frost-nova",
+      "name": "Frost Nova",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "w",
+      "target": "ground",
+      "range": 11,
+      "radius": 3,
+      "cost": 34,
+      "cd": 20,
+      "cast": 0,
+      "channel": 0,
+      "duration": 1.4,
+      "effect": "teleporte até 11m (não atravessa obstáculos); 201 mágico + stun 1,4s em 3m; imune a dano por 0,2s",
+      "formula": "201 + stun 1,4s",
+      "source": "D.5 Frost Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "frost-lance",
+      "name": "Frost Lance",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "w",
+      "target": "direction",
+      "range": 9,
+      "radius": 3,
+      "cost": 8,
+      "cd": 8,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "explode ao atingir (3m): 425 mágico; reduz resistências 12% por 3s",
+      "formula": "425 + debuff -12% resistência",
+      "source": "D.5 Frost Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "glacial-obelisk",
+      "name": "Glacial Obelisk",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "w",
+      "target": "ground",
+      "range": 12,
+      "radius": 6,
+      "cost": 23,
+      "cd": 16,
+      "cast": 0.4,
+      "channel": 0,
+      "duration": 6,
+      "effect": "coloca objeto 6s; até 10 aliados em 6m recebem +20% dano e cooldown rate; recast: 221 mágico + slow 40% por 4s",
+      "formula": "buff em área + recast 221",
+      "source": "D.5 Frost Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "freezing-wind",
+      "name": "Freezing Wind",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "e",
+      "target": "cone",
+      "range": 12,
+      "radius": 0,
+      "cost": 46,
+      "cd": 18,
+      "cast": 0,
+      "channel": 0,
+      "duration": 2.8,
+      "effect": "cone frontal 12m: 574 mágico + root imediato 2,8s; sem pulsos nem slow gradual",
+      "formula": "574 + root 2,8s",
+      "source": "D.5/B Frost Freezing Wind (pós 29/06/2026)",
+      "confidence": "alta"
+    },
+    {
+      "id": "generous-heal",
+      "name": "Generous Heal",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "q",
+      "target": "ally",
+      "range": 15,
+      "radius": 0,
+      "cost": 18,
+      "cd": 1.5,
+      "cast": 0.5,
+      "channel": 0,
+      "duration": 4,
+      "effect": "cura 201 no aliado; alvo recebe +5% cura por 4s, até 3 cargas",
+      "formula": "201 x (1+cura lançada) x (1+cura recebida)",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "smite",
+      "name": "Smite",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "q",
+      "target": "ground",
+      "range": 13,
+      "radius": 2.5,
+      "cost": 11,
+      "cd": 3,
+      "cast": 0.5,
+      "channel": 0,
+      "duration": 3,
+      "effect": "330 mágico vs player / 390 vs mob (2,5m, delay 0,25s); próximo dano direto no alvo em 3s soma 109; acertar inimigo reduz CD 50%",
+      "formula": "330/390 + 109 condicional",
+      "source": "D.6/B Holy Smite",
+      "confidence": "alta"
+    },
+    {
+      "id": "holy-flash",
+      "name": "Holy Flash",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "q",
+      "target": "ground",
+      "range": 13,
+      "radius": 5,
+      "cost": 23,
+      "cd": 3.5,
+      "cast": 0.4,
+      "channel": 0,
+      "duration": 0.4,
+      "effect": "cura 213 em até 10 aliados na área (delay 0,4s)",
+      "formula": "213 por aliado x bônus de cura",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "sacred-pulse",
+      "name": "Sacred Pulse",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "w",
+      "target": "ally",
+      "range": 13,
+      "radius": 5,
+      "cost": 32,
+      "cd": 12,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "cura 81 até 5 aliados em 5m; dano 321 vs players / 482 vs mobs; empurra players 12,58m, mobs lançados 1s",
+      "formula": "81 cura + 321/482 dano",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "holy-beam",
+      "name": "Holy Beam",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "w",
+      "target": "ally",
+      "range": 12,
+      "radius": 0,
+      "cost": 37,
+      "cd": 12,
+      "cast": 0,
+      "channel": 3,
+      "duration": 3,
+      "effect": "SÓ outro aliado (não pode self); canal 3s, conjurador -30% movimento; cura 101 por 0,5s crescendo +12 por tick até 7 stacks (total 959); no FFA sem aliado não há alvo válido: informa e não consome",
+      "formula": "101+12 por tick, 7 ticks = 959",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "holy-blessing",
+      "name": "Holy Blessing",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "w",
+      "target": "ally",
+      "range": 13,
+      "radius": 0,
+      "cost": 23,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "+86 Armor e +30% cura recebida por 4s; imunidade a forced movement",
+      "formula": "+86 Armor (pontos) +30% Healing Received",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "holy-orb",
+      "name": "Holy Orb",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "w",
+      "target": "direction",
+      "range": 25,
+      "radius": 7,
+      "cost": 29,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "projétil direcional 25m; ao tocar aliado cura 272 até 10 aliados em 7m",
+      "formula": "272 por aliado x bônus de cura",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "reawaken",
+      "name": "Reawaken",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "w",
+      "target": "ally",
+      "range": 12,
+      "radius": 0,
+      "cost": 66,
+      "cd": 30,
+      "cast": 1,
+      "channel": 0,
+      "duration": 0,
+      "effect": "alvo aliado caído: levanta com 30% vida máxima; lockout no alvo 3min; fora das modalidades atuais raramente tem alvo",
+      "formula": "30% da vida máxima do alvo",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "desperate-prayer",
+      "name": "Desperate Prayer",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "e",
+      "target": "ally",
+      "range": 13,
+      "radius": 0,
+      "cost": 43,
+      "cd": 10,
+      "cast": 0,
+      "channel": 0,
+      "duration": 15,
+      "effect": "cura 201 se alvo acima de 40% HP, 443 se abaixo; curando acima do limite, +5% cura lançada no conjurador 15s (máx 3)",
+      "formula": "201/443 x bônus; exatamente 40% conta como acima (hipótese)",
+      "source": "D.6 Holy Staff",
+      "confidence": "media"
+    },
+    {
+      "id": "deep-cuts",
+      "name": "Deep Cuts",
+      "items": [
+        "battleaxe",
+        "dagger"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "a cada 4 AA aplica sangramento: 55 físico total (machado) / 57 (adaga)",
+      "formula": "sangramento por contador de AA",
+      "source": "D.2/D.3 passivas",
+      "confidence": "baixa",
+      "approx": "duração atual não recuperada; valores de captura antiga",
+      "variants": {
+        "battleaxe": "55 físico total",
+        "dagger": "57 físico total"
+      }
+    },
+    {
+      "id": "life-leech",
+      "name": "Life Leech",
+      "items": [
+        "battleaxe",
+        "dagger"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "cada AA cura 15% da vida efetivamente perdida pelo inimigo",
+      "formula": "cura = 15% do dano efetivo pós-defesa",
+      "source": "D.2/D.3 passivas",
+      "confidence": "baixa",
+      "approx": "cálculo pós-resistência/PvE a testar"
+    },
+    {
+      "id": "increased-defense",
+      "name": "Increased Defense",
+      "items": [
+        "battleaxe"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 2,
+      "effect": "a cada 5 AA, +29% resistências por 2s",
+      "formula": "buff de resistência por contador",
+      "source": "D.2 passiva",
+      "confidence": "baixa",
+      "approx": "unidade do 29% (pontos vs percentual) a confirmar; adotado percentual"
+    },
+    {
+      "id": "aggressive-rush",
+      "name": "Aggressive Rush",
+      "items": [
+        "battleaxe",
+        "dagger"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "a cada 4 AA, +8% dano por 3s (machado) / +6% (adaga)",
+      "formula": "buff de dano por contador",
+      "source": "D.2/D.3 passivas",
+      "confidence": "baixa",
+      "approx": "refresh/stack pendente",
+      "variants": {
+        "battleaxe": "+8%",
+        "dagger": "+6%"
+      }
+    },
+    {
+      "id": "auto-attack-speed",
+      "name": "Auto-Attack Speed",
+      "items": [
+        "dagger"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "a cada 5 AA, +30% velocidade de AA por 3s",
+      "formula": "buff de velocidade de AA por contador",
+      "source": "D.3 passiva",
+      "confidence": "baixa",
+      "approx": "valor atual a confirmar; adotada captura"
+    },
+    {
+      "id": "burn",
+      "name": "Burn",
+      "items": [
+        "fire-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "cada AA aplica 72 mágico total em 3s",
+      "formula": "72/3s por aplicação",
+      "source": "D.4 passiva",
+      "confidence": "baixa",
+      "approx": "ticks/acúmulo pendentes"
+    },
+    {
+      "id": "energetic",
+      "name": "Energetic",
+      "items": [
+        "fire-staff",
+        "frost-staff",
+        "holy-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "cada AA restaura 3,6 energia",
+      "formula": "+3,6 energia por AA que acerta (hipótese: exige acerto)",
+      "source": "D.4/D.5/D.6 passivas",
+      "confidence": "media"
+    },
+    {
+      "id": "aggressive-caster",
+      "name": "Aggressive Caster",
+      "items": [
+        "fire-staff",
+        "frost-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "após 4 skills, -40% tempo de conjuração por 3s",
+      "formula": "buff de cast por contador de skills",
+      "source": "D.4/D.5 passivas",
+      "confidence": "media"
+    },
+    {
+      "id": "furious",
+      "name": "Furious",
+      "items": [
+        "fire-staff",
+        "frost-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "após 5 skills, +10% dano por 4s",
+      "formula": "buff de dano por contador de skills",
+      "source": "D.4/D.5 passivas",
+      "confidence": "media"
+    },
+    {
+      "id": "frost",
+      "name": "Frost",
+      "items": [
+        "frost-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "após 4 skills, próximo AA enraíza ~1,2s",
+      "formula": "root 1,2s reduzido por CCR",
+      "source": "D.5 passiva",
+      "confidence": "baixa",
+      "approx": "captura 2025 traz 0,86s; adotado 1,2s atual"
+    },
+    {
+      "id": "adrenaline-driven-charity",
+      "name": "Adrenaline Driven Charity",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "após 4 skills, +20% cura lançada por 3s",
+      "formula": "buff de Healing Cast por contador",
+      "source": "D.6 passiva",
+      "confidence": "media"
+    },
+    {
+      "id": "magic-force",
+      "name": "Magic Force",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "após 5 skills, próximo AA empurra o alvo ~2,99m",
+      "formula": "knockback 2,99m",
+      "source": "D.6 passiva",
+      "confidence": "baixa",
+      "approx": "interrupção de cast da captura antiga não confirmada; adotado só empurrão"
+    },
+    {
+      "id": "ascended",
+      "name": "Ascended",
+      "items": [
+        "holy-staff"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua do cajado: +5% dano e cura lançada",
+      "formula": "+5% contínuo (hipótese do projeto)",
+      "source": "D.6 opção confirmada, efeito não recuperado",
+      "confidence": "baixa",
+      "approx": "efeito atual não recuperado; adotado +5% contínuo"
+    },
+    {
+      "id": "energizing-shield",
+      "name": "Energizing Shield",
+      "items": [
+        "mercenary-hood",
+        "soldier-helmet",
+        "scholar-cowl"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 25,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "escudo 505 (pré-resistência) por 3s + restaura 25% da energia faltante",
+      "formula": "escudo absorve antes das resistências; energia = 25% da faltante",
+      "source": "D.6/D.7 Scholar Cowl IP1100 confirmado",
+      "confidence": "alta",
+      "approx": "mesmo valor adotado nos 3 elmos (comparação individual pendente)"
+    },
+    {
+      "id": "cleanse",
+      "name": "Cleanse",
+      "items": [
+        "mercenary-hood"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "remove todos os debuffs purgáveis do usuário",
+      "formula": "purge sem dano nem cura",
+      "source": "D.1 matriz (ficha sem números)",
+      "confidence": "baixa",
+      "approx": "custo/CD instantâneos adotados (hipótese: 0/30s)"
+    },
+    {
+      "id": "howl",
+      "name": "Howl",
+      "items": [
+        "mercenary-hood"
+      ],
+      "slot": "active",
+      "target": "cone",
+      "range": 8,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "cone frontal: 163 mágico, slow 35% por 4s, -30% dano causado por 4s, interrompe conjuração",
+      "formula": "163 + slow/debuff 4s",
+      "source": "D.7 Howl",
+      "confidence": "baixa",
+      "approx": "alcance/cone/custo/CD não fechados; adotado cone 8m, 0/30s"
+    },
+    {
+      "id": "mend-wounds",
+      "name": "Mend Wounds",
+      "items": [
+        "mercenary-jacket",
+        "soldier-armor",
+        "scholar-robe"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 7,
+      "duration": 7,
+      "effect": "só fora de combate, canal 7s, movimento -50%: a cada 1s recupera 9% vida máx + 7,5% energia máx; não recebe Healing Cast Bonus",
+      "formula": "9% HP + 7,5% EN por pulso de 1s",
+      "source": "D.7 Mend Wounds",
+      "confidence": "media",
+      "approx": "nº de pulsos/1º tick por item a validar; adotado 1 pulso por segundo"
+    },
+    {
+      "id": "inferno-shield",
+      "name": "Inferno Shield",
+      "items": [
+        "mercenary-jacket"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 4,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "escudo de chamas 5s: reflete 20% do dano recebido como mágico em 4m",
+      "formula": "reflect 20% por evento",
+      "source": "D.1 matriz (ficha não recuperada)",
+      "confidence": "baixa",
+      "approx": "ficha não recuperada; adotado reflect 20%/5s/CD30 (hipótese)"
+    },
+    {
+      "id": "bloodlust",
+      "name": "Bloodlust",
+      "items": [
+        "mercenary-jacket"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 6,
+      "effect": "por 6s: cada dano direto causado cura 30% do dano efetivo, limite 120 por acerto e 600 no buff; sem bônus flat por AA",
+      "formula": "cura = 30% do dano direto efetivo pós-mitigação; cap 120/acerto, cap 600/buff",
+      "source": "D.7 Bloodlust (heal por aplicação/janela/stacks/eventos elegíveis; ficha sem números) + intenção proximidade máxima §4",
+      "confidence": "baixa",
+      "approx": "ficha sem %/limite publicados; adotado 30%/120 por acerto/600 por buff como hipótese jogável preservando efeito principal (cura escala com dano direto, não flat +50/+30 por AA)"
+    },
+    {
+      "id": "dodge",
+      "name": "Dodge",
+      "items": [
+        "mercenary-shoes",
+        "soldier-boots",
+        "scholar-sandals"
+      ],
+      "slot": "active",
+      "target": "ground",
+      "range": 5,
+      "radius": 0,
+      "cost": 0,
+      "cd": 20,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "salto ao ponto (5m); imune a dano/debuff/CC por 0,8s; +40% movimento por 5s",
+      "formula": "dash + imunidade 0,8s + buff movimento",
+      "source": "D.7 Dodge (update 13/04/2026)",
+      "confidence": "media"
+    },
+    {
+      "id": "refreshing-sprint",
+      "name": "Refreshing Sprint",
+      "items": [
+        "mercenary-shoes"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "+40% movimento e +20% cooldown rate por 5s",
+      "formula": "buffs de movimento e CD",
+      "source": "D.1 matriz (ficha incompleta)",
+      "confidence": "baixa",
+      "approx": "valores atuais não recuperados; adotado 40%/20%/5s (hipótese)"
+    },
+    {
+      "id": "break-free",
+      "name": "Break Free",
+      "items": [
+        "mercenary-shoes"
+      ],
+      "slot": "active",
+      "target": "ground",
+      "range": 12,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "dash até 12m; limpa CC; utilizável sob stun/silence",
+      "formula": "dash + purge de CC",
+      "source": "D.7 Break Free",
+      "confidence": "media"
+    },
+    {
+      "id": "stone-skin",
+      "name": "Stone Skin",
+      "items": [
+        "soldier-helmet"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "buff 4s: +33% Defense",
+      "formula": "+33% Defense vs tudo",
+      "source": "D.7 Stone Skin",
+      "confidence": "media"
+    },
+    {
+      "id": "block",
+      "name": "Block",
+      "items": [
+        "soldier-helmet"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 2.5,
+      "duration": 2.5,
+      "effect": "canaliza até 2,5s podendo mover: imune a dano e CC",
+      "formula": "imunidade durante o canal",
+      "source": "D.7 Block",
+      "confidence": "media"
+    },
+    {
+      "id": "taunt",
+      "name": "Taunt",
+      "items": [
+        "soldier-armor"
+      ],
+      "slot": "active",
+      "target": "enemy",
+      "range": 8,
+      "radius": 5,
+      "cost": 15,
+      "cd": 20,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "provoca o inimigo (prioridade máx + ameaça em 5m vs mob); vs player: +20% dano causado pelo alvo e -25% Defense vs players por 3s",
+      "formula": "debuff -25% Defense + ameaça PvE",
+      "source": "D.7 Soldier Armor",
+      "confidence": "baixa",
+      "approx": "custo/CD/range não fechados; adotado 15/20s/8m (hipótese)"
+    },
+    {
+      "id": "fury",
+      "name": "Fury",
+      "items": [
+        "soldier-armor"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 29,
+      "cd": 35,
+      "cast": 0,
+      "channel": 0,
+      "duration": 10,
+      "effect": "ativa 10s: dano recebido gera stacks (máx 8); cada stack +8% dano e +5% duração de CC",
+      "formula": "+8% dano e +5% CC por stack",
+      "source": "D.7 Soldier Armor (pós 21/07/2026)",
+      "confidence": "media"
+    },
+    {
+      "id": "rejuvenating-sprint",
+      "name": "Rejuvenating Sprint",
+      "items": [
+        "soldier-boots"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "+80% movimento por 5s; cura 40 por segundo durante o sprint",
+      "formula": "+80% mov + 40 HP/s x5s",
+      "source": "D.7 Rejuvenating Sprint (captura antiga)",
+      "confidence": "baixa",
+      "approx": "cura atual não encontrada; adotado 40/s (hipótese)"
+    },
+    {
+      "id": "wanderlust",
+      "name": "Wanderlust",
+      "items": [
+        "soldier-boots"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 8,
+      "effect": "+80% movimento por 8s enquanto fora de combate; entrar em combate cancela",
+      "formula": "buff de movimento fora de combate",
+      "source": "D.1 matriz (carga/velocidade/cancelamento pendentes)",
+      "confidence": "baixa",
+      "approx": "duração e cancelamento adotados (hipótese: 8s, cancela em combate)"
+    },
+    {
+      "id": "force-field",
+      "name": "Force Field",
+      "items": [
+        "scholar-cowl"
+      ],
+      "slot": "active",
+      "target": "area",
+      "range": 0,
+      "radius": 6,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0.5,
+      "channel": 0,
+      "duration": 0,
+      "effect": "onda em 6m: knockback 9m (ignora CCR) + 177 mágico",
+      "formula": "177 + knockback 9m",
+      "source": "D.6 Scholar Cowl confirmado (custo 0, CD30, stand 0,5s)",
+      "confidence": "media"
+    },
+    {
+      "id": "aegis-of-energy",
+      "name": "Aegis of Energy",
+      "items": [
+        "scholar-cowl"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 4,
+      "effect": "+105 Armor e +28 Magic Resistance por 4s; cada dano recebido restaura 42 energia",
+      "formula": "+105/+28 pontos + 42 EN por dano",
+      "source": "D.6/B Scholar Cowl confirmado",
+      "confidence": "alta"
+    },
+    {
+      "id": "frost-shield",
+      "name": "Frost Shield",
+      "items": [
+        "scholar-robe"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 26,
+      "cd": 40,
+      "cast": 0,
+      "channel": 0,
+      "duration": 8,
+      "effect": "+83 resistência por 8s; reflete 15% do dano como magia; atacante recebe slow 40% por 2s",
+      "formula": "+83 pontos + reflect 15% + slow",
+      "source": "D.6/B Scholar Robe confirmado",
+      "confidence": "alta"
+    },
+    {
+      "id": "speed-caster",
+      "name": "Speed Caster",
+      "items": [
+        "scholar-robe"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 26,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 8,
+      "effect": "-50% conjuração e -70% custos de energia por 8s",
+      "formula": "multiplicadores de cast e custo",
+      "source": "D.6/B Scholar Robe confirmado",
+      "confidence": "alta"
+    },
+    {
+      "id": "energetic-sprint",
+      "name": "Energetic Sprint",
+      "items": [
+        "scholar-sandals"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "+80% movimento por 5s; restaura 11 energia a cada 1s",
+      "formula": "+80% mov + 11 EN/s x5s",
+      "source": "D.6 Scholar Sandals",
+      "confidence": "media"
+    },
+    {
+      "id": "focused-run",
+      "name": "Focused Run",
+      "items": [
+        "scholar-sandals"
+      ],
+      "slot": "active",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 30,
+      "cast": 0,
+      "channel": 4.5,
+      "duration": 4.5,
+      "effect": "canal 4,5s: +70% movimento; imune a stun/root/slow; restaura 11 energia a cada 0,5s",
+      "formula": "+70% mov + 11 EN/0,5s x4,5s",
+      "source": "D.6 Scholar Sandals",
+      "confidence": "media"
+    },
+    {
+      "id": "balanced-mind",
+      "name": "Balanced Mind",
+      "items": [
+        "mercenary-hood",
+        "mercenary-jacket",
+        "mercenary-shoes"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua: +1,5% dano e cura lançada, +1% Defense",
+      "formula": "+1,5% contínuo por peça",
+      "source": "D.7 passivas Mercenary",
+      "confidence": "baixa",
+      "approx": "mesmo valor adotado nas 3 peças; soma entre peças adotada aditiva"
+    },
+    {
+      "id": "swiftness",
+      "name": "Swiftness",
+      "items": [
+        "mercenary-hood",
+        "mercenary-jacket",
+        "mercenary-shoes"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua: +6% velocidade de AA",
+      "formula": "+6% AA speed por peça (aditivo, hipótese)",
+      "source": "D.7 passivas Mercenary",
+      "confidence": "baixa",
+      "approx": "escopo/stack com Tocha pendente; adotado aditivo"
+    },
+    {
+      "id": "quick-thinker",
+      "name": "Quick Thinker",
+      "items": [
+        "mercenary-hood",
+        "mercenary-jacket",
+        "mercenary-shoes"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua: +2,5% Cooldown Rate",
+      "formula": "CD final = CD base / (1 + soma rates)",
+      "source": "D.7 passivas Mercenary",
+      "confidence": "baixa",
+      "approx": "mesmo valor nas 3 peças; soma com Tome/Tocha aditiva (hipótese)"
+    },
+    {
+      "id": "courier",
+      "name": "Courier",
+      "items": [
+        "mercenary-shoes",
+        "soldier-boots",
+        "scholar-sandals"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "SEM EFEITO nesta versão (sem peso/inventário): tooltip informa que é inerte; selecionável sem bônus",
+      "formula": "sem modificador",
+      "source": "PRODUTO §14 Courier inerte",
+      "confidence": "alta"
+    },
+    {
+      "id": "toughness",
+      "name": "Toughness",
+      "items": [
+        "soldier-helmet",
+        "soldier-armor",
+        "soldier-boots"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua de Defense: elmo +2,5%, armadura +5%, botas +2,5%",
+      "formula": "+Defense contínuo por peça (aditivo, hipótese)",
+      "source": "D.7 passivas Soldier",
+      "confidence": "baixa",
+      "approx": "botas sem valor publicado; adotado 2,5% (= elmo)",
+      "variants": {
+        "soldier-helmet": "+2,5%",
+        "soldier-armor": "+5%",
+        "soldier-boots": "+2,5%"
+      }
+    },
+    {
+      "id": "authority",
+      "name": "Authority",
+      "items": [
+        "soldier-helmet",
+        "soldier-armor",
+        "soldier-boots"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua de duração de CC: elmo +5%, armadura +10%, botas +5%",
+      "formula": "+duração de CC por peça (aditivo, hipótese)",
+      "source": "D.7 passivas Soldier",
+      "confidence": "baixa",
+      "approx": "botas sem valor publicado; adotado 5% (= elmo)",
+      "variants": {
+        "soldier-helmet": "+5%",
+        "soldier-armor": "+10%",
+        "soldier-boots": "+5%"
+      }
+    },
+    {
+      "id": "tenacity",
+      "name": "Tenacity",
+      "items": [
+        "soldier-helmet",
+        "soldier-armor",
+        "soldier-boots"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua de CCR: elmo +10%, armadura +20%, botas +10%",
+      "formula": "+CCR percentual por peça (aditivo, hipótese)",
+      "source": "D.7 passivas Soldier",
+      "confidence": "baixa",
+      "approx": "botas sem valor publicado; adotado 10% (= elmo)",
+      "variants": {
+        "soldier-helmet": "+10%",
+        "soldier-armor": "+20%",
+        "soldier-boots": "+10%"
+      }
+    },
+    {
+      "id": "spirit-crush",
+      "name": "Spirit Crush",
+      "items": [
+        "soldier-armor"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 3,
+      "effect": "cada AA reduz vida máx e atual do MOB em 12% por 3s; sem efeito em jogadores",
+      "formula": "-12% HP mob 3s por AA",
+      "source": "D.7 Soldier Armor",
+      "confidence": "media"
+    },
+    {
+      "id": "protective-instinct",
+      "name": "Protective Instinct",
+      "items": [
+        "soldier-armor"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva PvE: +400% Threat gerada",
+      "formula": "threat x5",
+      "source": "D.7 Soldier Armor",
+      "confidence": "media"
+    },
+    {
+      "id": "aggression",
+      "name": "Aggression",
+      "items": [
+        "scholar-cowl",
+        "scholar-robe",
+        "scholar-sandals"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua de dano e cura: capuz/sandálias +3,5%, túnica +8%",
+      "formula": "+dano/cura por peça (aditivo, hipótese)",
+      "source": "D.6/B Scholar por peça confirmado",
+      "confidence": "alta",
+      "variants": {
+        "scholar-cowl": "+3,5%",
+        "scholar-robe": "+8%",
+        "scholar-sandals": "+3,5%"
+      }
+    },
+    {
+      "id": "concentration",
+      "name": "Concentration",
+      "items": [
+        "scholar-cowl",
+        "scholar-robe",
+        "scholar-sandals"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua de conjuração: capuz/sandálias -5%, túnica -10%",
+      "formula": "-cast time por peça (aditivo, hipótese)",
+      "source": "D.6/B Scholar por peça confirmado",
+      "confidence": "alta",
+      "variants": {
+        "scholar-cowl": "-5%",
+        "scholar-robe": "-10%",
+        "scholar-sandals": "-5%"
+      }
+    },
+    {
+      "id": "efficiency",
+      "name": "Efficiency",
+      "items": [
+        "scholar-cowl",
+        "scholar-robe",
+        "scholar-sandals"
+      ],
+      "slot": "passive",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 0,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "passiva contínua de custo: capuz/sandálias -6%, túnica -12%",
+      "formula": "-custo energia por peça (aditivo, hipótese)",
+      "source": "D.6/B Scholar por peça confirmado",
+      "confidence": "alta",
+      "variants": {
+        "scholar-cowl": "-6%",
+        "scholar-robe": "-12%",
+        "scholar-sandals": "-6%"
+      }
+    },
+    {
+      "id": "sandstorm",
+      "name": "Sandstorm (Bridgewatch)",
+      "items": [
+        "cape-bridgewatch"
+      ],
+      "slot": "cape",
+      "target": "area",
+      "range": 0,
+      "radius": 5,
+      "cost": 0,
+      "cd": 75,
+      "cast": 0,
+      "channel": 0,
+      "duration": 6,
+      "effect": "ao usar skill do slot E: aura 6s em 5m (até 25 alvos); dentro: slow -40% e CCR -30% por 5s (reaplicável); slow ignora CCR/DR",
+      "formula": "gatilho CastFinished do E; não dispara com CD da capa",
+      "source": "E/B Bridgewatch",
+      "confidence": "baixa",
+      "approx": "CD tooltip atual não observado; adotado 75s (último tooltip 1:15)"
+    },
+    {
+      "id": "untouchable",
+      "name": "Untouchable (Fort Sterling)",
+      "items": [
+        "cape-fort-sterling"
+      ],
+      "slot": "cape",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 139,
+      "cast": 0,
+      "channel": 0,
+      "duration": 1,
+      "effect": "ao sofrer stun/silence/transformação/root: limpa CC/debuffs (exceto DoT) + imunidade 1s; Time Freeze não dispara",
+      "formula": "purge + imunidade 1s",
+      "source": "E/B Fort Sterling",
+      "confidence": "baixa",
+      "approx": "tooltip atual não observado; adotado 139s (último 2:19)"
+    },
+    {
+      "id": "energy-reserve",
+      "name": "Energy Reserve (Lymhurst)",
+      "items": [
+        "cape-lymhurst"
+      ],
+      "slot": "cape",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 182,
+      "cast": 0,
+      "channel": 0,
+      "duration": 10,
+      "effect": "cast que deixa energia abaixo de 40% da máx: restaura 70% da máx em 10s (10 parcelas de 7%)",
+      "formula": "gatilho estrito <40%; 7% x10 a cada 1s",
+      "source": "E/B Lymhurst",
+      "confidence": "baixa",
+      "approx": "tooltip atual não observado; adotado 182s (último 3:02)"
+    },
+    {
+      "id": "shield-of-protection",
+      "name": "Shield of Protection (Martlock)",
+      "items": [
+        "cape-martlock"
+      ],
+      "slot": "cape",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 225,
+      "cast": 0,
+      "channel": 0,
+      "duration": 5,
+      "effect": "vida cai abaixo de 25%: +50% Defense vs tudo por 5s (não é escudo de HP); não purgável",
+      "formula": "+50% Defense 5s",
+      "source": "E/B Martlock",
+      "confidence": "baixa",
+      "approx": "tooltip atual não observado; adotado 225s (último 3:45)"
+    },
+    {
+      "id": "chain-lightning-cape",
+      "name": "Chain Lightning (Thetford)",
+      "items": [
+        "cape-thetford"
+      ],
+      "slot": "cape",
+      "target": "enemy",
+      "range": 9,
+      "radius": 0,
+      "cost": 0,
+      "cd": 15,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "AA pode disparar raio automático: 242 mágico em até 4 alvos, saltos até 9m sem repetir alvo",
+      "formula": "242 por impacto; ICD 15s",
+      "source": "E/B Thetford",
+      "confidence": "baixa",
+      "approx": "tooltip atual não observado; adotado ICD 15s"
+    },
+    {
+      "id": "caerleon-reset",
+      "name": "Caerleon (Reinício do 1º slot)",
+      "items": [
+        "cape-caerleon"
+      ],
+      "slot": "cape",
+      "target": "self",
+      "range": 0,
+      "radius": 0,
+      "cost": 0,
+      "cd": 60,
+      "cast": 0,
+      "channel": 0,
+      "duration": 0,
+      "effect": "ao usar skill do 1º slot (Q): reinicia a recarga daquele slot, 1x por ativação; sem CD da capa disponível, não reinicia",
+      "formula": "reseta CD do Q; CD da capa 60s (hipótese §14)",
+      "source": "PRODUTO §14 hipótese do projeto",
+      "confidence": "baixa",
+      "approx": "sem valor confiável; adotado 60s (hipótese registrada)"
+    }
+  ]
+}

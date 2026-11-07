@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrettierRPG — Arena de Pedra</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23241c12'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23c9a86a'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topo">
+    <div class="marca"><span class="marca-escudo" aria-hidden="true">◈</span> PrettierRPG <small>arena de pedra · v1</small></div>
+    <div class="topo-audio">
+      <label class="audio-linha">🔊 <input type="checkbox" id="chk-som" checked> Som
+      <input type="range" id="rng-vol" min="0" max="100" value="60" aria-label="Volume"></label>
+    </div>
+  </header>
+
+  <!-- MENU -->
+  <section id="tela-menu" class="painel">
+    <h1>Arena de Pedra</h1>
+    <p class="sub">Duelo em arena medieval · FFA 2–12 · 5 min · 2v2 melhor-de-3 · Treino solo offline ou em rede</p>
+    <div id="hub-aviso" class="hub-aviso oculto"></div>
+    <div class="menu-grade">
+      <div class="campo">
+        <label for="in-nick">Apelido</label>
+        <input id="in-nick" maxlength="20" placeholder="Ex.: LâminaDoSul" autocomplete="off">
+      </div>
+      <div class="campo">
+        <label for="in-code">Código da sala</label>
+        <input id="in-code" maxlength="4" placeholder="Vazio = criar nova" autocomplete="off" style="text-transform:uppercase">
+      </div>
+      <div class="campo">
+        <label for="in-modo">Modo (ao criar)</label>
+        <select id="in-modo">
+          <option value="ffa" selected>FFA — todos contra todos</option>
+          <option value="2v2">2v2 — equipes (melhor de 3)</option>
+          <option value="pve">PvE — treino em rede</option>
+        </select>
+      </div>
+    </div>
+    <div class="linha">
+      <button id="btn-criar" class="btn-primario">Criar sala</button>
+      <button id="btn-entrar">Entrar com código</button>
+      <button id="btn-treino">⚔ Treino solo (PvE)</button>
+    </div>
+    <div class="linha">
+      <button id="btn-ajuda" class="btn-fantasma">❓ Como jogar</button>
+      <button id="btn-hub-voltar" class="btn-fantasma oculto">↩ Voltar ao Hub</button>
+    </div>
+    <h3>Sua build (vale antes da sala · salva neste navegador)</h3>
+    <div class="menu-3col">
+      <div id="mbuild-esq" aria-label="Controles e espaços de equipamento">
+        <h4>Controles</h4>
+        <p class="nota">Clique no chão p/ mover · clique no inimigo p/ atacar · Q/W/E + 4/5/6 miram, clique confirma · Esc cancela · roda = zoom.</p>
+        <label class="audio-linha">🔊 <input type="checkbox" id="chk-som-menu" checked> Som
+        <input type="range" id="rng-vol-menu" min="0" max="100" value="60" aria-label="Volume"></label>
+        <div id="mbuild-espacos"></div>
+      </div>
+      <div id="mbuild-centro" aria-label="Itens, skills e passivas"></div>
+      <div id="mbuild-dir" aria-label="Personagem e build atual">
+        <canvas id="menu-boneco" width="220" height="240" aria-label="Prévia do personagem"></canvas>
+        <div id="mbuild-equipado"></div>
+      </div>
+    </div>
+    <div id="menu-build-detalhe" class="build-detalhe"></div>
+    <p id="menu-build-erro" class="erro" role="alert"></p>
+    <p id="menu-erro" class="erro" role="alert"></p>
+    <p class="nota">Sem conta · sem internet após preparo · tudo local, sem fontes externas. Build salva neste navegador.</p>
+  </section>
+
+  <!-- LOBBY -->
+  <section id="tela-lobby" class="painel oculto">
+    <div class="lobby-topo">
+      <h2>Sala <span id="lobby-codigo" class="codigo">—</span></h2>
+      <span id="lobby-modo" class="etiqueta">FFA</span>
+    </div>
+    <p id="lobby-hub-info" class="nota oculto"></p>
+    <p class="nota">Mostre o código aos amigos. Marquem <b>Pronto</b> para começar. Trocar build ou equipe remove o pronto.</p>
+    <div class="linha" id="linha-modo">
+      <span class="nota">Modo (criador, no lobby):</span>
+      <button id="btn-modo-ffa" class="mini">FFA</button>
+      <button id="btn-modo-2v2" class="mini">2v2</button>
+      <button id="btn-modo-pve" class="mini">PvE</button>
+    </div>
+    <div id="lobby-lista"></div>
+    <h3>Sua build</h3>
+    <div id="lobby-build-resumo" class="build-resumo"></div>
+    <!-- Build principal inline: 3 áreas (espaços · grade · personagem+slots), sem modal obrigatório -->
+    <div id="lobby-build-inline" class="build-3col">
+      <div id="lbuild-esq" aria-label="Espaços de equipamento"></div>
+      <div id="lbuild-centro" aria-label="Itens e opções"></div>
+      <div id="lbuild-dir" aria-label="Personagem e build atual">
+        <canvas id="lobby-boneco" width="220" height="240" aria-label="Prévia do personagem"></canvas>
+        <div id="lbuild-equipado"></div>
+      </div>
+    </div>
+    <div id="lobby-build-detalhe" class="build-detalhe"></div>
+    <p id="lobby-build-erro" class="erro" role="alert"></p>
+    <div class="linha">
+      <button id="btn-pronto" class="btn-primario">Pronto</button>
+      <button id="btn-build">🛠 Editar build</button>
+      <button id="btn-equipe" title="Alternar equipe (2v2 futuro)">🛡 Trocar equipe</button>
+      <button id="btn-sair-lobby" class="btn-perigo">Sair</button>
+    </div>
+    <p id="lobby-erro" class="erro" role="alert"></p>
+    <p class="nota">Equipes 2v2: escolha a equipe e marque pronto; 2 prontos por equipe iniciam. Só o criador troca o modo (no lobby).</p>
+  </section>
+
+  <!-- JOGO -->
+  <section id="tela-jogo" class="oculto">
+    <div id="hud-topo">
+      <div id="hud-placar" aria-live="polite"></div>
+      <div id="hud-meio"><span id="hud-tempo">⏱ —</span><span id="hud-wave" class="oculto"></span><span id="hud-fase"></span></div>
+      <div class="hud-acoes">
+        <button id="btn-ajuda-jogo" class="mini" title="Ajuda">?</button>
+        <button id="btn-som-jogo" class="mini" title="Ativar/mutar som">🔊</button>
+        <button id="btn-sair-jogo" class="mini btn-perigo" title="Sair da partida">✕ Sair</button>
+      </div>
+    </div>
+    <div id="jogo-corpo">
+      <div id="painel-jogador" class="painel-entidade" aria-live="polite"></div>
+      <div id="painel-alvo" class="painel-entidade oculto" aria-live="polite"></div>
+      <canvas id="cv" width="960" height="600"></canvas>
+      <aside id="painel-lateral">
+        <h4>Combatentes</h4>
+        <div id="lista-combate"></div>
+        <div id="painel-treino" class="oculto">
+          <h4>Treino PvE</h4>
+          <div class="treino-linha"><span>Dano total no monstro</span><b id="tr-dano">0</b></div>
+          <div class="treino-linha"><span>DPS (últimos 5 s)</span><b id="tr-dps">0,0</b></div>
+          <div class="treino-linha"><span>Cura total</span><b id="tr-cura">0</b></div>
+          <div class="treino-linha"><span>Efeitos no monstro</span><b id="tr-efeitos">sem efeitos</b></div>
+          <div class="linha">
+            <button id="btn-treino-zerar-dano" class="mini">Zerar dano/DPS</button>
+            <button id="btn-treino-zerar-cura" class="mini">Zerar cura</button>
+          </div>
+          <div class="linha">
+            <button id="btn-treino-build" class="mini">🛠 Build</button>
+            <button id="btn-treino-sair" class="mini btn-perigo">Encerrar treino</button>
+          </div>
+          <p class="nota">Monstro volta em 30 s. Boneco testa cura. Abrir a build pausa o monstro.</p>
+        </div>
+      </aside>
+    </div>
+    <div id="mira-info" class="oculto"></div>
+    <div id="finish-info" class="oculto"></div>
+    <div id="editor-faixa" class="oculto"></div>
+    <div id="barra-skills"></div>
+    <div id="toast" role="status"></div>
+    <div id="aviso-respawn" class="oculto"></div>
+    <div id="tela-result" class="oculto">
+      <div class="result-caixa">
+        <h3 id="result-titulo">Fim de partida</h3>
+        <div id="result-tabela"></div>
+        <div class="linha centro"><button id="btn-voltar-lobby" class="btn-primario">Voltar ao lobby</button></div>
+        <p class="nota">O lobby reabre sozinho em 30 s. Desconectados voltam com código e vaga.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODAL BUILD: 3 regiões (§3) — esquerda: espaços · centro: itens do espaço + opções · direita: boneco + equipado -->
+  <div id="modal-build" class="modal oculto" role="dialog" aria-modal="true" aria-label="Editor de build">
+    <div class="modal-caixa modal-build">
+      <h3>🛠 Editor de build <small>T8 Normal · IP 1100</small></h3>
+      <div class="build-3col">
+        <div id="build-esq" aria-label="Espaços de equipamento"></div>
+        <div id="build-centro" aria-label="Itens e opções"></div>
+        <div id="build-dir" aria-label="Personagem e build atual">
+          <canvas id="build-boneco" width="220" height="240" aria-label="Prévia do personagem"></canvas>
+          <div id="build-equipado"></div>
+        </div>
+      </div>
+      <div id="build-detalhe" class="build-detalhe"></div>
+      <p id="build-erro" class="erro" role="alert"></p>
+      <p id="build-aviso-servidor" class="nota"></p>
+      <div class="linha">
+        <button id="btn-build-salvar" class="btn-primario">Salvar build</button>
+        <button id="btn-build-fechar">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL AJUDA -->
+  <div id="modal-ajuda" class="modal oculto" role="dialog" aria-modal="true" aria-label="Ajuda">
+    <div class="modal-caixa">
+      <h3>❓ Como jogar</h3>
+      <div class="ajuda-texto">
+        <p><b>Mover:</b> clique no chão (linha reta, para no obstáculo). <b>Atacar:</b> clique no inimigo. No treino em rede o monstro é <b>__monster__</b> e o boneco é <b>__dummy__</b> (servidor só reconhece esses IDs).</p>
+        <p><b>Habilidades Q / W / E + 4=HEAD, 5=CHEST, 6=BOOTS:</b> pressione a tecla para mirar, clique para confirmar (botões da barra também armam a mira). <b>Esc</b> cancela a mira. Sem energia, em recarga ou alvo inválido, o jogo avisa e não gasta nada. Mensagem de skill: <span class="etiqueta">type skill, slot Q/W/E/HEAD/CHEST/BOOTS, skill id, target, x/y em área/direção</span>.</p>
+        <p><b>Alvos:</b> <span class="etiqueta">inimigo</span> precisa de inimigo · <span class="etiqueta">aliado</span> só em equipe · <span class="etiqueta">área/ponto</span> confirma no chão (envia x/y) · <span class="etiqueta">direção</span> confirma na direção (envia x/y) · <span class="etiqueta">si</span> aplica em você.</p>
+        <p><b>Treino offline (fallback):</b> se o servidor estiver inalcançável, o treino solo abre local com aviso — equivalência parcial (mesmas teclas/alvos, números simplificados). Nunca mascara erro de conexão: o aviso sempre aparece. O treino em rede usa dano/cura do servidor.</p>
+        <p><b>Câmera:</b> segue seu personagem. <b>Roda do mouse</b> = zoom (limites 0,5×–2×).</p>
+        <p><b>Barras e contornos:</b> verde = você · azul = aliado · vermelho = inimigo. Proteção = anel azul-claro. Caído = cinza com ampulheta.</p>
+        <p><b>FFA:</b> 5 min, vence quem tem mais eliminações. Caiu? Renasce em 5 s com 3 s de proteção (atacar quebra). <b>2v2:</b> melhor de 3, sem renascimento; após 2 min a <b>onda (wave)</b> fecha até o centro e causa dano crescente fora dela — fique dentro do círculo claro.</p>
+        <p><b>Cura:</b> números verdes aparecem só para sua equipe (no FFA, só os seus). Dano vermelho todos veem.</p>
+        <p><b>Caído/finalização:</b> golpe de monstro/autodano derruba por 15 s + 5 s levantando. Clique no caído para selecionar; botão <b>Finalizar (5 s)</b> aparece perto de inimigo caído — canalizar 5 s mata (andar, sofrer dano, usar habilidade, desconectar ou sair do alcance interrompe e avisa). Aliado caído: use <b>Despertar (Reawaken)</b> nele (30% vida). Exceções: <b>onda (wave)</b> mata direto sem caído; <b>PvE</b> mata direto com respawn 3 s (sem caído/finalização); <b>PvP</b> mata direto (sem caído) — finalização só após queda por monstro/autodano.</p>
+        <p><b>Sair:</b> pede confirmação e remove na hora. Sala vazia é encerrada e libera o código.</p>
+        <p><b>Sons:</b> sintetizados no navegador, sem arquivos. Ative/mute no topo e ajuste o volume.</p>
+      </div>
+      <div class="linha"><button id="btn-ajuda-fechar" class="btn-primario">Entendi</button></div>
+    </div>
+  </div>
+</div>
+<script src="client.js"></script>
+</body>
+</html>
