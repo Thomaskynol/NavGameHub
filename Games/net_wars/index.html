@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NET WARS — combate espacial arcade</title>
+<style>
+  :root {
+    --bg: #04060d;
+    --panel: rgba(10, 18, 38, .88);
+    --line: #27406e;
+    --txt: #dfe8ff;
+    --dim: #8fa3c8;
+    --cyan: #44ccff;
+    --red: #ff4d6d;
+    --green: #51ff7a;
+    --amber: #ffcc33;
+    --violet: #b47aff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--txt);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+  h1, h2, h3, .arcade { font-family: "Consolas", "SF Mono", monospace; letter-spacing: .18em;
+    text-transform: uppercase; text-shadow: 0 0 18px rgba(68, 204, 255, .55); }
+  button { font-family: inherit; }
+  #stage, #game-canvas { position: fixed; inset: 0; }
+  #game-canvas { display: block; }
+
+  /* ===== telas (menu/lobby/fim/pausa/ajuda/conf) ===== */
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, rgba(20, 40, 90, .55), rgba(2, 4, 10, .88) 70%);
+    z-index: 30; padding: 16px; overflow-y: auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 26px 30px; min-width: 300px; max-width: 560px; width: min(92vw, 560px);
+    box-shadow: 0 0 40px rgba(43, 108, 255, .25); }
+  .card h1 { margin: 0 0 4px; font-size: 34px; color: #fff; }
+  .card h1 .w { color: var(--cyan); }
+  .sub { color: var(--dim); font-size: 13px; margin: 0 0 16px; }
+  .row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  label.f { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: .1em; flex: 1; min-width: 130px; }
+  input[type=text], input:not([type]) { padding: 10px; border-radius: 8px; border: 1px solid #334;
+    background: #111a30; color: #fff; font-size: 15px; }
+  input[type=color] { height: 40px; border: 1px solid #334; border-radius: 8px; background: #111a30; padding: 2px 6px; }
+  .btn { padding: 11px 18px; border-radius: 9px; border: 1px solid var(--line); background: #16294f;
+    color: #fff; font-size: 15px; cursor: pointer; transition: transform .08s, box-shadow .15s; }
+  .btn:hover { box-shadow: 0 0 14px rgba(68, 204, 255, .5); transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(135deg, #2b6cff, #44ccff); border: 0; font-weight: 700; }
+  .btn.ghost { background: transparent; }
+  .btn.warn { border-color: var(--red); color: #ffb3c0; }
+  .btn.big { font-size: 17px; padding: 13px 22px; }
+  .kbd { display: inline-block; min-width: 26px; text-align: center; padding: 2px 7px; margin: 1px;
+    border: 1px solid #4a5f8a; border-bottom-width: 3px; border-radius: 6px; background: #0d1528;
+    font-family: Consolas, monospace; font-size: 12px; }
+  .help-grid { font-size: 14px; line-height: 2; color: var(--txt); }
+  .help-grid small { color: var(--dim); display: block; line-height: 1.5; margin: 8px 0; }
+  .set-grid { display: flex; flex-direction: column; gap: 12px; font-size: 14px; }
+  .set-grid label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .set-grid input[type=range] { width: 160px; accent-color: var(--cyan); }
+
+  /* lobby */
+  #l-code { font-family: Consolas, monospace; font-size: 40px; letter-spacing: .3em; color: var(--cyan);
+    text-shadow: 0 0 22px rgba(68, 204, 255, .7); margin: 4px 0; }
+  #l-link { font-size: 12px; color: var(--dim); word-break: break-all; }
+  .meter { height: 8px; background: #1a2542; border-radius: 5px; overflow: hidden; margin-top: 6px; }
+  .meter > div { height: 100%; background: linear-gradient(90deg, #2b6cff, #44ccff); width: 0; }
+  #l-rows { margin: 12px 0; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .lrow { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.04);
+    padding: 7px 10px; border-radius: 8px; font-size: 14px; }
+  .lrow.me { border: 1px solid var(--cyan); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: 0 0 8px currentColor; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 20px; margin-left: auto; font-weight: 700; }
+  .tag.red { background: rgba(255, 77, 109, .2); color: #ff8ba0; }
+  .tag.blue { background: rgba(68, 204, 255, .2); color: #8fe3ff; }
+  .tag.bots { background: rgba(255, 80, 40, .2); color: #ff9a6a; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { flex: 1; padding: 9px 6px; border-radius: 8px; border: 1px solid var(--line);
+    background: #101b36; color: var(--dim); font-size: 13px; cursor: pointer; white-space: nowrap; }
+  .seg button.on { background: linear-gradient(135deg, #2b6cff, #44ccff); color: #fff; border-color: transparent; }
+  #m-teams button.on[data-team=red] { background: linear-gradient(135deg, #a3243c, #ff4d6d); }
+  #m-teams button.on[data-team=blue] { background: linear-gradient(135deg, #1d5fb8, #44ccff); }
+  .rules { font-size: 13px; color: var(--dim); background: rgba(255,255,255,.03);
+    border-left: 3px solid var(--cyan); padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 10px 0; }
+
+  /* ===== HUD (partida) — tudo pointer-events:none, nunca cobre a mira ===== */
+  #hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: none;
+    font-family: Consolas, "SF Mono", monospace; }
+  #reticle { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 14;
+    width: 34px; height: 34px; }
+  #reticle::before, #reticle::after { content: ""; position: absolute; background: rgba(140, 230, 255, .95);
+    box-shadow: 0 0 6px rgba(68, 204, 255, .9); }
+  #reticle::before { left: 16px; top: 2px; width: 2px; height: 30px;
+    clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%, 0 65%, 100% 65%, 100% 100%, 0 100%); }
+  #reticle::after { top: 16px; left: 2px; height: 2px; width: 30px;
+    clip-path: polygon(0 0, 35% 0, 35% 100%, 0 100%, 65% 100%, 65% 0, 100% 0, 100% 100%); }
+  #ret-dot { position: absolute; left: 15px; top: 15px; width: 4px; height: 4px; border-radius: 50%;
+    background: #fff; box-shadow: 0 0 8px #fff; }
+  #hitmarker { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg) scale(.6);
+    width: 44px; height: 44px; opacity: 0; z-index: 14; }
+  #hitmarker::before, #hitmarker::after { content: ""; position: absolute; background: #ffe08a;
+    box-shadow: 0 0 10px var(--amber); }
+  #hitmarker::before { left: 21px; top: 0; width: 3px; height: 44px; }
+  #hitmarker::after { top: 21px; left: 0; height: 3px; width: 44px; }
+  #hitmarker.show { animation: hitpop .3s ease-out; }
+  @keyframes hitpop { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(.6); } }
+  /* Duas miras: #reticle = nariz (ONDE ESTÁ o tiro real); #aim-cursor = mouse (PARA ONDE VAI, só 3ª pessoa).
+     Em 1ª pessoa o mouse gira a nave direto (sem cursor); na 3ª o nariz persegue o cursor com taxa limitada (instructor). */
+  #aim-cursor { position: fixed; left: 50%; top: 40%; width: 26px; height: 26px; z-index: 14;
+    display: none; transform: translate(-50%, -50%); pointer-events: none; }
+  #aim-cursor::before { content: ""; position: absolute; inset: 0; border: 2px solid rgba(255, 204, 51, .95);
+    border-radius: 50%; box-shadow: 0 0 8px rgba(255, 204, 51, .7); }
+  #aim-cursor::after { content: ""; position: absolute; left: 11px; top: 11px; width: 4px; height: 4px;
+    border-radius: 50%; background: var(--amber); }
+  /* vinheta de dano só nas bordas — centro (mira) sempre limpo */
+  #dmg-vignette { position: fixed; inset: 0; opacity: 0; z-index: 13;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(255, 30, 50, .55) 100%); }
+  #dmg-vignette.show { animation: dmgflash .5s ease-out; }
+  @keyframes dmgflash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  .panel { background: rgba(4, 8, 18, .62); border: 1px solid rgba(60, 100, 170, .5);
+    border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(2px); }
+  #top-left { position: fixed; top: 12px; left: 12px; min-width: 200px; white-space: nowrap; }
+  #hp-num { font-size: 22px; color: #fff; }
+  .bar { height: 9px; background: #20263c; border-radius: 5px; margin-top: 5px; overflow: hidden; }
+  .bar > div { height: 100%; width: 100%; border-radius: 5px; transition: width .2s; }
+  #hp-fill { background: linear-gradient(90deg, #2be36b, #7dffb0); }
+  #shield-row { display: none; align-items: center; gap: 6px; margin-top: 5px; font-size: 11px; color: #8fe3ff; }
+  #sh-fill { background: linear-gradient(90deg, #2b6cff, #8fe3ff); }
+  #me-kda { font-size: 11px; color: var(--dim); margin-top: 5px; }
+  #bonus-box { display: none; margin-top: 6px; font-size: 12px; color: var(--amber); align-items: center; gap: 6px; }
+
+  #top-center { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); text-align: center; }
+  #match-timer { font-size: 30px; color: #fff; text-shadow: 0 0 14px rgba(68, 204, 255, .6); }
+  #match-timer.urgent { color: #ffb3c0; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .45; } }
+  #match-mode { font-size: 11px; letter-spacing: .25em; color: var(--cyan); }
+  #wave-info { font-size: 12px; color: var(--dim); margin-top: 2px; }
+
+  #top-right { position: fixed; top: 12px; right: 12px; text-align: right; min-width: 190px; }
+  #roster { font-size: 12px; line-height: 1.7; }
+  .rrow { display: flex; justify-content: space-between; gap: 12px; }
+  .rrow.me { color: var(--cyan); font-weight: 700; }
+  #team-score { display: none; gap: 10px; justify-content: flex-end; font-size: 13px; margin-top: 4px; }
+  .t-red { color: #ff8ba0; } .t-blue { color: #8fe3ff; }
+  #ping { display: none; font-size: 11px; color: var(--dim); }
+  #fps { font-size: 10px; color: #54627f; }
+
+  #bottom-left { position: fixed; left: 12px; bottom: 12px; font-size: 12px; }
+  .wrow { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+  #w-missile.ready { color: var(--amber); }
+  #w-name { color: #8fe3ff; font-weight: 700; }
+  #w-name.missel { color: var(--amber); }
+  #missile-cd { width: 90px; }
+  #lock-ind { color: var(--dim); }
+  #lock-ind.on { color: var(--amber); text-shadow: 0 0 10px var(--amber); }
+  #boost-fill { background: linear-gradient(90deg, #b47aff, #44ccff); }
+  #boost-fill.low { background: linear-gradient(90deg, #e63a3a, #ff8d8d); }
+  #thr-fill { background: linear-gradient(90deg, #2be36b, #ffcc33); }
+  #cam-label { color: var(--dim); font-size: 11px; }
+
+  #bottom-right { position: fixed; right: 12px; bottom: 12px; text-align: center; }
+  #radar { width: 128px; height: 128px; border-radius: 50%; background: rgba(4, 10, 22, .7);
+    border: 1px solid rgba(68, 204, 255, .5); }
+  #radar-label { font-size: 10px; color: var(--dim); letter-spacing: .2em; }
+
+  #warns { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 6px; align-items: center; z-index: 12; }
+  .warn { background: rgba(4, 8, 18, .8); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; animation: win .2s ease-out; white-space: nowrap; }
+  .warn.kill { border-color: var(--red); } .warn.bonus { border-color: var(--green); color: #c9ffda; }
+  .warn.bad { border-color: var(--red); color: #ffc9d2; }
+  .warn.fade { opacity: 0; transition: opacity .4s; }
+  @keyframes win { from { transform: translateY(8px); opacity: 0; } }
+
+  #offscreen { position: fixed; inset: 0; z-index: 11; }
+  .os-arrow { position: fixed; font-size: 18px; transform: translate(-50%, -50%); opacity: .9; }
+  .os-arrow.foe { color: var(--red); text-shadow: 0 0 8px var(--red); }
+
+  #conn { position: fixed; top: 86px; left: 50%; transform: translateX(-50%); display: none;
+    background: rgba(60, 10, 20, .85); border: 1px solid var(--red); border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; z-index: 15; }
+  #hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px;
+    color: var(--txt); background: rgba(4, 8, 18, .7); padding: 7px 14px; border-radius: 8px;
+    display: none; white-space: nowrap; z-index: 12; font-family: system-ui, sans-serif; }
+  #scoreboard { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(2, 4, 10, .55); z-index: 20; }
+  #scoreboard .box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 26px; min-width: 320px; }
+  .srow { display: flex; justify-content: space-between; gap: 24px; padding: 4px 0; font-size: 14px; }
+  .srow.me { color: var(--cyan); font-weight: 700; }
+  #countdown { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    font-size: 110px; font-family: Consolas, monospace; color: #fff; z-index: 18;
+    text-shadow: 0 0 40px var(--cyan); }
+  #dead-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px; background: radial-gradient(ellipse at center, transparent 40%, rgba(120, 0, 10, .5));
+    z-index: 16; }
+  #dead-overlay h2 { color: #ff8ba0; margin: 0; font-size: 30px; }
+
+  /* hub */
+  #hub-box { position: fixed; top: 12px; right: 12px; z-index: 40; display: none;
+    background: rgba(4, 8, 18, .85); border: 1px solid var(--violet); border-radius: 10px;
+    padding: 10px 14px; font-size: 12px; max-width: 260px; }
+  #hub-box h3 { margin: 0 0 6px; font-size: 12px; color: var(--violet); }
+  #hub-list { color: var(--dim); }
+  #hub-up { color: #54627f; font-size: 10px; }
+  #hub-back { display: none; margin-top: 8px; }
+  #hub-note { display: none; font-size: 12px; color: var(--violet); margin-bottom: 10px; }
+
+  .over-title { margin: 0 0 12px; font-size: 30px; }
+  #final-rows { margin-bottom: 8px; }
+  @media (max-width: 720px) {
+    #top-right { display: none; }
+    #bottom-right { transform: scale(.8); transform-origin: bottom right; }
+  }
+</style>
+<script type="importmap">{ "imports": { "three": "/vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="stage"></div>
+
+<!-- ============ HUD da partida ============ -->
+<div id="hud">
+  <div id="reticle"><div id="ret-dot"></div></div>
+  <div id="aim-cursor"></div>
+  <div id="hitmarker"></div>
+  <div id="dmg-vignette"></div>
+  <div id="top-left" class="panel">
+    <div>N AVE <span id="hp-num">100</span></div>
+    <div class="bar"><div id="hp-fill"></div></div>
+    <div id="shield-row">ESCUDO<div class="bar" style="flex:1"><div id="sh-fill"></div></div></div>
+    <div id="me-kda">ABATES 0 · MORTES 0</div>
+    <div id="bonus-box">✦ <span id="bonus-t"></span></div>
+  </div>
+  <div id="top-center" class="panel">
+    <div id="match-timer">5:00</div>
+    <div id="match-mode">LIVRE P/ TODOS</div>
+    <div id="wave-info"></div>
+  </div>
+  <div id="top-right" class="panel">
+    <div id="roster"></div>
+    <div id="team-score"></div>
+    <div id="ping"></div>
+    <div id="fps"></div>
+  </div>
+  <div id="bottom-left" class="panel">
+    <div class="wrow"><span>▸ ARMA [F]</span><span id="w-name">LASER</span><span id="w-laser" style="color:var(--green)">∞</span></div>
+    <div class="wrow"><span>▸ MÍSSIL [E]</span><span id="w-missile">PRONTO [E]</span></div>
+    <div class="bar" id="missile-cd"></div>
+    <div class="wrow"><span id="lock-ind">○ sem alvo</span></div>
+    <div class="wrow"><span>BOOST [Shift+W]</span></div>
+    <div class="bar"><div id="boost-fill"></div></div>
+    <div class="wrow" id="thr-row" style="display:none"><span>▸ MANETE [W/S]</span><span id="thr-val">65%</span></div>
+    <div class="bar" id="thr-bar" style="display:none"><div id="thr-fill"></div></div>
+    <div class="wrow"><span id="cam-label">🎥 1ª PESSOA · mouse=VAI · cruz=NARIZ</span></div>
+  </div>
+  <div id="bottom-right">
+    <canvas id="radar" width="128" height="128"></canvas>
+    <div id="radar-label">RADAR</div>
+  </div>
+  <div id="warns"></div>
+  <div id="offscreen"></div>
+  <div id="conn"></div>
+  <div id="hint">mouse GIRA a nave direto · ✛ central = TIRO · click rajada · E míssil · F arma · Tab placar · Esc pausa</div>
+  <div id="scoreboard"><div class="box"><h3>Placar — segure Tab</h3><div id="score-rows"></div></div></div>
+  <div id="countdown"></div>
+  <div id="dead-overlay"><h2>NAVE DESTRUÍDA</h2><div id="dead-t">renascendo…</div></div>
+</div>
+
+<!-- ============ MENU ============ -->
+<div id="screen-menu" class="screen">
+  <div class="card">
+    <div id="hub-note">◈ vindo do Game Hub — nome e sala já preenchidos, sem digitar de novo</div>
+    <h1>NET <span class="w">WARS</span></h1>
+    <p class="sub">combate espacial arcade · até 12 pilotos · 5 min · no navegador, sem instalar</p>
+    <label class="f">Apelido
+      <input id="m-name" maxlength="20" placeholder="ex: estelar_99" autocomplete="off">
+    </label>
+    <label class="f">Modo
+      <span class="seg" id="m-modes">
+        <button data-mode="ffa" class="on">⚔ FFA</button><button data-mode="teams">RED×BLUE</button><button data-mode="survival">👾 survival</button>
+      </span>
+    </label>
+    <label class="f">Equipe (teams)
+      <span class="seg" id="m-teams">
+        <button class="on">auto</button><button data-team="red">🔴 red</button><button data-team="blue">🔵 blue</button>
+      </span>
+    </label>
+    <label class="f">Câmera — escolha antes de voar
+      <span class="seg" id="m-cam">
+        <button data-cam="fp" class="on">🎥 1ª pessoa · cockpit</button><button data-cam="tp">✈ 3ª pessoa · WT</button>
+      </span>
+    </label>
+    <p class="sub" style="margin:6px 0 0">1ª pessoa: o mouse <b>gira a nave direto</b> (sem cursor) · 3ª pessoa: ○ amarelo = mouse (segure deslocado p/ virar, nunca some — direita é sempre direita) · ✛ central = tiro. 1ª pessoa é o padrão estilo NetWars 1993; 3ª pessoa pilota como avião do War Thunder (bank-to-turn, manete W/S).</p>
+    <div class="row">
+      <label class="f">Cor da nave <input id="m-color" type="color" value="#44ccff"></label>
+      <label class="f">Código da sala <input id="m-room" maxlength="32" placeholder="ffa1" autocomplete="off"></label>
+    </div>
+    <div class="row">
+      <button id="btn-create" class="btn primary big">+ criar sala</button>
+      <button id="btn-join" class="btn big">➤ entrar</button>
+    </div>
+    <div class="row">
+      <button id="btn-settings" class="btn ghost">⚙ configurações</button>
+      <button id="btn-help" class="btn ghost">❓ como jogar</button>
+    </div>
+    <p class="sub" style="margin:14px 0 0">clique em criar/entrar e depois <b>clique na arena</b>: isso trava a mira e liga o som 🔊</p>
+  </div>
+</div>
+
+<!-- ============ LOBBY ============ -->
+<div id="screen-lobby" class="screen" style="display:none">
+  <div class="card">
+    <h2 style="margin:0">Hangar — sala</h2>
+    <div id="l-code">FFA1</div>
+    <div id="l-link"></div>
+    <div class="row">
+      <button id="l-copy" class="btn ghost">⧉ copiar link</button>
+      <button id="l-shuffle" class="btn ghost">🌀 auto-distribuir equipes</button>
+    </div>
+    <div class="rules"><b id="l-mode">FFA · 5min</b> <span id="l-modenote"></span><br><span id="l-rules"></span></div>
+    <label class="f">Câmera (vale na hora do VOAR)
+      <span class="seg" id="l-cam">
+        <button data-cam="fp" class="on">🎥 1ª pessoa</button><button data-cam="tp">✈ 3ª pessoa WT</button>
+      </span>
+    </label>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--dim)">
+      <span>Pilotos <b id="l-count">1/12</b></span><span id="l-state">aguardando…</span><span id="l-expect"></span>
+    </div>
+    <div class="meter"><div id="l-countbar"></div></div>
+    <div id="l-rows"></div>
+    <p class="sub" style="margin:8px 0 0">lobby autoritativo: <b>Estou pronto</b> marca prontidão p/ todos (<b>start</b>) · <b>host (♛) clica INICIAR PARTIDA</b> p/ ir a <b>playing</b> · 🌀 embaralha equipes só em lobby teams · morte/respawn e placar vêm do servidor.</p>
+    <div class="row">
+      <button id="l-ready" class="btn">Estou pronto</button>
+      <button id="l-start" class="btn primary big">🚀 VOAR!</button>
+    </div>
+    <div class="row">
+      <button id="lobby-back" class="btn ghost">← menu</button>
+      <button id="l-settings" class="btn ghost">⚙ câmera/controles</button>
+      <button id="btn-quit-lobby" class="btn ghost warn">sair</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RESULTADOS ============ -->
+<div id="screen-over" class="screen" style="display:none">
+  <div class="card" style="text-align:center">
+    <h2 id="final-title" class="over-title">🏁 Fim de jogo</h2>
+    <div id="final-rows"></div>
+    <div class="row" style="justify-content:center">
+      <button id="btn-rematch" class="btn primary big">🔁 revanche</button>
+      <button id="btn-quit-lobby2" class="btn ghost">menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PAUSA (Esc) ============ -->
+<div id="screen-pause" class="screen" style="display:none">
+  <div class="card">
+    <h2 style="margin:0 0 10px">⏸ Pausado</h2>
+    <p class="sub">a partida continua no servidor — volte rápido! (clique em continuar e depois na arena p/ retravar a mira)</p>
+    <div class="row"><button id="pause-resume" class="btn primary big">▶ continuar</button></div>
+    <div class="row">
+      <button id="pause-settings" class="btn ghost">⚙ configurações</button>
+      <button id="pause-quit" class="btn ghost warn">abandonar partida</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ COMO JOGAR ============ -->
+<div id="screen-help" class="screen" style="display:none">
+  <div class="card">
+    <h2 style="margin:0 0 10px">❓ Como jogar</h2>
+    <div class="help-grid">
+      <div>○ amarelo = MOUSE na 3ª pessoa (direção que você quer): <b>segure deslocado para virar, centralize para voar reto</b> — direita é sempre direita. &nbsp; ✛ central = NARIZ (para onde a bala vai — atire com ela). Em 1ª pessoa o mouse <b>gira a nave direto</b> (sem cursor ○).</div>
+      <div><span class="kbd">1ª pessoa</span> cockpit (padrão NetWars 1993): mouse gira a nave direto · <span class="kbd">W</span><span class="kbd">S</span> empuxo · <span class="kbd">A</span><span class="kbd">D</span> rolagem manual</div>
+      <div><span class="kbd">3ª pessoa</span> WT: <span class="kbd">W</span><span class="kbd">S</span> manete (persiste) · <span class="kbd">A</span><span class="kbd">D</span> bank + leme · mouse dita a mira, avião banca p/ virar</div>
+      <div><span class="kbd">click</span> laser em rajada (segurar) &nbsp; <span class="kbd">E</span>/<span class="kbd">botão dir.</span> míssil teleguiado (precisa de lock ◉) &nbsp; <span class="kbd">F</span> troca arma &nbsp; <span class="kbd">Shift</span>+<span class="kbd">W</span> boost</div>
+      <div><span class="kbd">Tab</span> placar (segurar) &nbsp; <span class="kbd">Esc</span> pausa &nbsp; <span class="kbd">M</span> mudo &nbsp; <span class="kbd">H</span> ajuda</div>
+      <small>▲/▼ no radar e nas setas = inimigo acima/abaixo. O radar mostra <b>posição atual</b> — sem previsão de tiro e sem mira automática.
+      A mira central é o tiro. O míssil só trava (◉) com o inimigo na mira até 140m e sem obstáculo no caminho — aliado nunca trava. Contorne a estação e os asteroides (a colisão machuca!); rotas ▲acima/▼abaixo do núcleo. Borda azul = limite: volte antes de bater.</small>
+      <small>🔊 O som é todo sintetizado na hora (sem downloads). Se a aba ficar oculta, o áudio pausa sozinho.</small>
+    </div>
+    <div class="row"><button id="help-close" class="btn primary">entendi, pilotar!</button></div>
+  </div>
+</div>
+
+<!-- ============ CONFIGURAÇÕES ============ -->
+<div id="screen-settings" class="screen" style="display:none">
+  <div class="card">
+    <h2 style="margin:0 0 10px">⚙ Configurações</h2>
+    <div class="set-grid">
+      <label>Câmera <span class="seg" id="s-cam" style="min-width:280px"><button data-cam="fp">🎥 1ª pessoa · cockpit</button><button data-cam="tp">✈ 3ª pessoa · WT</button></span></label>
+      <label>Volume <input id="s-vol" type="range" min="0" max="1" step="0.05"></label>
+      <label>Mudo <input id="s-mute" type="checkbox"></label>
+      <label>Sensibilidade da mira <input id="s-sens" type="range" min="0.3" max="2.5" step="0.1"></label>
+      <label>Inverter eixo Y <input id="s-inv" type="checkbox"></label>
+      <label>Qualidade <select id="s-quality"><option value="high">alta</option><option value="low">baixa</option></select></label>
+      <label>Reduzir tremor/efeitos <input id="s-fx" type="checkbox"></label>
+    </div>
+    <p class="sub">ajustes salvos neste navegador · seu apelido/cor ficam só nesta aba</p>
+    <div class="row"><button id="settings-close" class="btn primary">salvar e voltar</button></div>
+  </div>
+</div>
+
+<!-- ============ HUB ============ -->
+<div id="hub-box">
+  <h3>◈ GAME HUB</h3>
+  <div id="hub-list">…</div>
+  <div id="hub-up"></div>
+  <button id="hub-back" class="btn ghost">← voltar ao hub</button>
+</div>
+
+<script type="module" src="/client/main.js"></script>
+</body>
+</html>
